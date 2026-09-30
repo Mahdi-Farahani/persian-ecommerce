@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swa
 import type { AuthUser, Paginated, ProductCard, ProductDetail } from '@pe/shared';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser, Public, RequirePermissions } from '../auth/auth.decorators.js';
+import { PublicCache } from '../common/decorators/public-cache.decorator.js';
 import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { Permissions } from '../rbac/permissions.js';
 import {
@@ -35,6 +36,7 @@ import { ProductsService } from './products.service.js';
 
 @ApiTags('products')
 @Public()
+@PublicCache()
 @Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}

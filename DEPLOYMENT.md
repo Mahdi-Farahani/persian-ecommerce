@@ -293,3 +293,30 @@ is enabled.
 Drop the proxy CA (`*.crt`) into `infra/docker/certs/` before
 `docker compose build`; the Dockerfiles trust it for package downloads. The
 directory is git-ignored.
+
+## Backup and restore (as built)
+
+* **Backup**: `infra/scripts/backup-db.sh [dir]` runs `mariadb-dump
+  --single-transaction` inside the `mariadb` container and writes a gzipped
+  SQL file named `<database>-<UTC timestamp>.sql.gz` (default `./backups`).
+  Schedule it from cron on the host, e.g. daily at 03:00:
+  `0 3 * * * cd /srv/persian-ecommerce && infra/scripts/backup-db.sh /srv/backups >> /var/log/pe-backup.log 2>&1`.
+* **Retention**: the script keeps the newest 30 files locally; copy the
+  directory to off-site object storage (e.g. `rclone sync`) for longer
+  retention. Recommended: 30 daily, 12 monthly, and a copy before every
+  deployment (`git pull && infra/scripts/backup-db.sh`).
+* **Uploads**: product images live in the `api-uploads` volume; back it up
+  with `docker run --rm -v persian-ecommerce_api-uploads:/data -v $PWD/backups:/out alpine tar czf /out/uploads-$(date -u +%Y%m%dT%H%M%SZ).tgz -C /data .`.
+* **Restore**: `infra/scripts/restore-db.sh <file.sql.gz>` stops `api` and
+  `web`, streams the dump into MariaDB and starts them again. Migrations are
+  idempotent, so a restored database from an older release is upgraded on the
+  next API start (`RUN_MIGRATIONS_ON_START=true`).
+* **Disaster recovery**: provision a host with Docker, clone the repository at
+  the deployed tag, restore `.env` from the secrets store (never from git),
+  `docker compose up -d mariadb`, restore the latest dump and the uploads
+  archive, then `docker compose up -d`. Verify `/health/ready`, `/`, a
+  product page and an admin login. Rotate `JWT_ACCESS_SECRET` if the old
+  host may be compromised; gateway credentials stay valid because they are
+  encrypted with `PAYMENT_ENCRYPTION_KEY`, which must be restored verbatim.
+* **Test restores** quarterly on a staging host; a backup that has never been
+  restored is not a backup.

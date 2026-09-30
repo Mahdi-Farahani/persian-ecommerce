@@ -11,6 +11,7 @@ import { Transform } from 'class-transformer';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser, Public, RequirePermissions } from '../auth/auth.decorators.js';
+import { PublicCache } from '../common/decorators/public-cache.decorator.js';
 import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { ProductListQueryDto } from '../products/dto/product.dto.js';
 import { Permissions } from '../rbac/permissions.js';
@@ -26,6 +27,7 @@ export class SuggestQueryDto {
 }
 
 @ApiTags('search')
+@PublicCache()
 @Controller('search')
 export class SearchController {
   constructor(private readonly search: SearchService) {}

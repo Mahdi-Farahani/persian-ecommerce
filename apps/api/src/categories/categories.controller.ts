@@ -14,6 +14,7 @@ import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swa
 import type { AuthUser, CategoryDetail, CategoryNode } from '@pe/shared';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser, Public, RequirePermissions } from '../auth/auth.decorators.js';
+import { PublicCache } from '../common/decorators/public-cache.decorator.js';
 import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { Permissions } from '../rbac/permissions.js';
 import { type AdminCategory, CategoriesService } from './categories.service.js';
@@ -21,6 +22,7 @@ import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto.js';
 
 @ApiTags('categories')
 @Public()
+@PublicCache()
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categories: CategoriesService) {}

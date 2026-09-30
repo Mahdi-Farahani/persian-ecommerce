@@ -221,6 +221,7 @@ model AuditLog {
   @@index([actorId])
   @@index([entityType, entityId])
   @@index([action])
+  @@index([action, createdAt])
   @@index([createdAt])
   @@map("audit_logs")
 }
@@ -389,6 +390,7 @@ model Product {
 
   @@index([status])
   @@index([categoryId, status])
+  @@index([categoryId, status, minPrice])
   @@index([brandId, status])
   @@index([minPrice])
   @@index([createdAt])
@@ -702,6 +704,7 @@ model Order {
   @@index([status, createdAt])
   @@index([status, paymentDeadlineAt])
   @@index([createdAt])
+  @@index([paidAt])
   @@map("orders")
 }
 

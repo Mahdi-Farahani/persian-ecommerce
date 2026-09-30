@@ -15,6 +15,7 @@ import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swa
 import type { AuthUser, BrandDetail, BrandSummary, Paginated } from '@pe/shared';
 import { AuditService } from '../audit/audit.service.js';
 import { CurrentUser, Public, RequirePermissions } from '../auth/auth.decorators.js';
+import { PublicCache } from '../common/decorators/public-cache.decorator.js';
 import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { Permissions } from '../rbac/permissions.js';
 import { BrandsService } from './brands.service.js';
@@ -22,6 +23,7 @@ import { AdminBrandsQueryDto, CreateBrandDto, UpdateBrandDto } from './dto/brand
 
 @ApiTags('brands')
 @Public()
+@PublicCache()
 @Controller('brands')
 export class BrandsController {
   constructor(private readonly brands: BrandsService) {}
