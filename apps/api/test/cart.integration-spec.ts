@@ -280,7 +280,7 @@ describe('Cart & checkout (integration)', () => {
         .http()
         .patch(`/api/v1/admin/inventory/${charger}/adjust`)
         .set(bearer(admin))
-        .send({ quantity: -(inv.body.stockQuantity - 2) })
+        .send({ quantity: -(inv.body.availableQuantity - 2) })
         .expect(200);
       const short = await ctx.http().get('/api/v1/cart').set(bearer(user)).expect(200);
       expect(short.body.items[0].quantityExceedsStock).toBe(true);
@@ -293,7 +293,7 @@ describe('Cart & checkout (integration)', () => {
         .http()
         .patch(`/api/v1/admin/inventory/${charger}/adjust`)
         .set(bearer(admin))
-        .send({ quantity: inv.body.stockQuantity - 2 })
+        .send({ quantity: inv.body.availableQuantity - 2 })
         .expect(200);
     });
   });
@@ -526,7 +526,7 @@ describe('Cart & checkout (integration)', () => {
         .http()
         .patch(`/api/v1/admin/inventory/${charger}/adjust`)
         .set(bearer(admin))
-        .send({ quantity: -inv.body.stockQuantity })
+        .send({ quantity: -inv.body.availableQuantity })
         .expect(200);
       const quote = await ctx
         .http()
@@ -540,7 +540,7 @@ describe('Cart & checkout (integration)', () => {
         .http()
         .patch(`/api/v1/admin/inventory/${charger}/adjust`)
         .set(bearer(admin))
-        .send({ quantity: inv.body.stockQuantity })
+        .send({ quantity: inv.body.availableQuantity })
         .expect(200);
       const empty = await registerUser(ctx);
       const res = await ctx

@@ -23,6 +23,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       connectionLimit: Number(url.searchParams.get('connection_limit') ?? 10),
       timezone: 'Z',
       allowPublicKeyRetrieval: true,
+      // MariaDB 11 enables innodb_snapshot_isolation: under REPEATABLE READ a
+      // `SELECT … FOR UPDATE` issued after an earlier read in the same
+      // transaction fails with error 1020 when the row changed meanwhile.
+      // Our write paths rely on row locks, so sessions run READ COMMITTED.
+      initSql: [`SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED`],
     });
     super({
       adapter,

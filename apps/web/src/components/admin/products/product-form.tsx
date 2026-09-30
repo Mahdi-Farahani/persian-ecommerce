@@ -406,6 +406,7 @@ export function ProductForm({
         <Card>
           <CardTitle>{copy.sections.inventory}</CardTitle>
           <InventorySection
+            productId={product.id}
             variants={product.variants}
             canManage={permissions.manageInventory}
             onChanged={refreshProduct}

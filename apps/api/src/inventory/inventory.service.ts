@@ -1,16 +1,27 @@
 import { Injectable } from '@nestjs/common';
+import {
+  buildPagination,
+  type InventoryItemView,
+  type InventorySnapshot,
+  type InventorySummary,
+  type InventoryTransactionView,
+  type Paginated,
+} from '@pe/shared';
 import { NotFoundAppException, UnprocessableAppException } from '../common/errors/app.exception.js';
-import type { InventoryTransactionType, Prisma } from '../generated/prisma/client.js';
+import { Prisma, type InventoryTransactionType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-export interface InventorySnapshot {
-  variantId: string;
-  stockQuantity: number;
-  reservedQuantity: number;
-  availableQuantity: number;
-  lowStockThreshold: number;
-  lowStock: boolean;
-  updatedAt: string;
+export type { InventorySnapshot } from '@pe/shared';
+
+export interface InventoryListQuery {
+  page: number;
+  limit: number;
+  search?: string;
+  /** Only variants at or below their low-stock threshold. */
+  lowStock?: boolean;
+  /** Only variants with no available units. */
+  outOfStock?: boolean;
+  productId?: string;
 }
 
 export interface AdjustStockInput {
@@ -46,6 +57,38 @@ export class InsufficientStockError extends UnprocessableAppException {
 
 type Tx = Prisma.TransactionClient;
 type LockedRow = { stockQuantity: number; reservedQuantity: number; lowStockThreshold: number };
+
+const inventoryItemInclude = {
+  variant: {
+    include: {
+      product: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }], take: 1 },
+        },
+      },
+    },
+  },
+} satisfies Prisma.InventoryInclude;
+
+type InventoryItemRow = Prisma.InventoryGetPayload<{ include: typeof inventoryItemInclude }>;
+
+function toInventoryItem(row: InventoryItemRow): InventoryItemView {
+  return {
+    ...InventoryService.toSnapshot(row),
+    sku: row.variant.sku,
+    variantTitle: row.variant.title,
+    variantStatus: row.variant.status,
+    productId: row.variant.product.id,
+    productTitle: row.variant.product.title,
+    productSlug: row.variant.product.slug,
+    productStatus: row.variant.product.status,
+    imageUrl: row.variant.product.images[0]?.url ?? null,
+  };
+}
 
 /**
  * Stock ledger. Every mutation runs inside a transaction that locks the
@@ -84,6 +127,17 @@ export class InventoryService {
     if (!row)
       throw new NotFoundAppException('INVENTORY_NOT_FOUND', 'موجودی برای این تنوع ثبت نشده است');
     return InventoryService.toSnapshot(row);
+  }
+
+  /** Snapshot plus the variant/product identity (admin detail page). */
+  async getItem(variantId: string): Promise<InventoryItemView> {
+    const row = await this.prisma.inventory.findUnique({
+      where: { variantId },
+      include: inventoryItemInclude,
+    });
+    if (!row)
+      throw new NotFoundAppException('INVENTORY_NOT_FOUND', 'موجودی برای این تنوع ثبت نشده است');
+    return toInventoryItem(row);
   }
 
   /** Ensures an inventory row exists for a variant (used on variant creation). */
@@ -253,23 +307,68 @@ export class InventoryService {
     return InventoryService.toSnapshot(row);
   }
 
-  async transactions(
-    variantId: string,
-    limit = 50,
-  ): Promise<
-    Array<{
-      id: string;
-      type: InventoryTransactionType;
-      quantity: number;
-      stockAfter: number;
-      reservedAfter: number;
-      referenceType: string | null;
-      referenceId: string | null;
-      note: string | null;
-      actorId: string | null;
-      createdAt: string;
-    }>
-  > {
+  /** Admin list: one row per tracked variant with product context and filters. */
+  async list(query: InventoryListQuery): Promise<Paginated<InventoryItemView>> {
+    const variant: Prisma.ProductVariantWhereInput = {};
+    if (query.productId) variant.productId = query.productId;
+    if (query.search) {
+      variant.OR = [
+        { sku: { contains: query.search } },
+        { title: { contains: query.search } },
+        { product: { title: { contains: query.search } } },
+      ];
+    }
+    const where: Prisma.InventoryWhereInput = Object.keys(variant).length > 0 ? { variant } : {};
+    // Filters on derived quantities use raw comparisons between columns.
+    const conditions: Prisma.Sql[] = [];
+    if (query.lowStock)
+      conditions.push(Prisma.sql`stockQuantity - reservedQuantity <= lowStockThreshold`);
+    if (query.outOfStock) conditions.push(Prisma.sql`stockQuantity - reservedQuantity <= 0`);
+    if (conditions.length > 0) {
+      const ids = await this.prisma.$queryRaw<Array<{ variantId: string }>>(
+        Prisma.sql`SELECT variantId FROM inventory WHERE ${Prisma.join(conditions, ' AND ')}`,
+      );
+      where.variantId = { in: ids.map((r) => r.variantId) };
+    }
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.inventory.count({ where }),
+      this.prisma.inventory.findMany({
+        where,
+        include: inventoryItemInclude,
+        orderBy: [{ stockQuantity: 'asc' }, { variantId: 'asc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+    ]);
+    return {
+      items: rows.map(toInventoryItem),
+      pagination: buildPagination(query.page, query.limit, total),
+    };
+  }
+
+  async summary(): Promise<InventorySummary> {
+    const [row] = await this.prisma.$queryRaw<
+      Array<{
+        tracked: bigint;
+        low: bigint;
+        out: bigint;
+        reserved: bigint | null;
+        stock: bigint | null;
+      }>
+    >(Prisma.sql`SELECT COUNT(*) AS tracked,
+        SUM(CASE WHEN stockQuantity - reservedQuantity <= lowStockThreshold THEN 1 ELSE 0 END) AS low,
+        SUM(CASE WHEN stockQuantity - reservedQuantity <= 0 THEN 1 ELSE 0 END) AS \`out\`,
+        SUM(reservedQuantity) AS reserved, SUM(stockQuantity) AS stock FROM inventory`);
+    return {
+      trackedVariants: Number(row?.tracked ?? 0),
+      lowStockVariants: Number(row?.low ?? 0),
+      outOfStockVariants: Number(row?.out ?? 0),
+      reservedUnits: Number(row?.reserved ?? 0),
+      stockUnits: Number(row?.stock ?? 0),
+    };
+  }
+
+  async transactions(variantId: string, limit = 50): Promise<InventoryTransactionView[]> {
     const rows = await this.prisma.inventoryTransaction.findMany({
       where: { variantId },
       orderBy: { createdAt: 'desc' },
