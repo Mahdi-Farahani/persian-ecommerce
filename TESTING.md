@@ -244,3 +244,21 @@ as deployed.
 * `apps/api/test/inventory.integration-spec.ts`: concurrent checkouts,
   sale/return/cancel ledger effects, manual adjustments, list/summary
   endpoints.
+
+### Marketplace and administration coverage (as built)
+
+* `apps/api/test/marketplace.integration-spec.ts`: seller application and
+  approval (SELLER role granted/revoked), duplicate and invalid
+  applications, offers appearing on the storefront with seller identity,
+  tenant isolation (a seller cannot read or change another seller's offers,
+  stock, orders or shipments), an order split between a seller and platform
+  stock with commission snapshots, per-seller dispatch advancing the order
+  only when everyone has shipped, settlement creation/payment/cancellation
+  rules and suspension hiding offers.
+* `apps/api/test/admin-dashboard.integration-spec.ts`: dashboard metric
+  consistency, audit-log filters and redaction, permission enforcement.
+* `apps/api/test/admin-permissions.integration-spec.ts`: authorization
+  matrix over every admin read endpoint for anonymous, customer, plain
+  ADMIN and SUPER_ADMIN callers, plus secret-free admin responses.
+* The integration global setup reseeds with `resetInventory: true` so paid
+  orders from earlier runs never deplete the shared fixtures.
