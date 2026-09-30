@@ -294,3 +294,75 @@ state-changing requests must send `X-Requested-With` (CSRF protection).
 | GET    | `/admin/permissions`        | `users.view`   |
 
 Permission keys are defined in `apps/api/src/rbac/permissions.ts`.
+
+## Catalog (public)
+
+| Method | Path                     | Notes |
+| ------ | ------------------------ | ----- |
+| GET    | `/categories`            | active category tree |
+| GET    | `/categories/:slug`      | breadcrumb, active children, filterable attributes (inherited from ancestors) |
+| GET    | `/brands`                | active brands |
+| GET    | `/brands/:slug`          | brand with public product count |
+| GET    | `/products`              | filters: `category` (slug, includes sub-categories), `brand` (comma list), `minPrice`/`maxPrice` (IRR), `inStock`, `attr[<slug>]=<valueSlug,...>`, `q`, `sort` (`newest`, `price_asc`, `price_desc`, `popular`, `rating`), `page`, `limit` |
+| GET    | `/products/:slug`        | detail: images, active variants with availability, variant attributes, specifications, breadcrumb |
+| GET    | `/uploads/*`             | stored images (immutable, served by the API; proxied by nginx and by a Next.js rewrite) |
+
+Only products with status `ACTIVE` or `OUT_OF_STOCK` are public. Prices are integers in IRR.
+
+## Catalog (admin, `catalog.view` / `catalog.manage`)
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| GET/POST | `/admin/products` | list (all statuses, search by title/slug/SKU) / create with variants, attributes, specifications, images |
+| GET/PATCH/DELETE | `/admin/products/:id` | detail (incl. inactive variants) / update fields, attributes, specifications / delete |
+| PATCH | `/admin/products/:id/status` | lifecycle status (ACTIVE requires an active variant) |
+| POST | `/admin/products/:id/variants` | add variant (`initialStock` creates a PURCHASE ledger entry) |
+| PATCH/DELETE | `/admin/variants/:variantId` | update / delete (a product keeps ≥ 1 variant) |
+| POST | `/admin/products/:id/images` | attach uploaded image |
+| PUT | `/admin/products/:id/images/order` | reorder |
+| PATCH/DELETE | `/admin/product-images/:imageId` | update metadata / remove |
+| POST | `/admin/uploads/images` | multipart `file`; validated with sharp, re-encoded to WebP ≤ 1600px, metadata stripped |
+| GET | `/admin/categories`, `/admin/categories/tree`, `/admin/categories/:id` | flat list / tree incl. inactive / detail |
+| POST/PATCH/DELETE | `/admin/categories[/:id]` | create / update (re-parenting rewrites the subtree path; cycles rejected) / delete empty |
+| GET/POST/PATCH/DELETE | `/admin/brands[/:id]` | paginated list / CRUD (delete only when unused) |
+| GET/POST/PATCH/DELETE | `/admin/attributes[/:id]` | CRUD with values (`values` replaces the list; values in use cannot be removed) |
+| GET | `/admin/inventory/:variantId` | snapshot (`inventory.view`) |
+| GET | `/admin/inventory/:variantId/transactions` | ledger |
+| PATCH | `/admin/inventory/:variantId/adjust` | signed quantity, type ADJUSTMENT/PURCHASE/RETURN (`inventory.manage`, audited) |
+| PATCH | `/admin/inventory/:variantId/threshold` | low-stock threshold |
+
+All admin mutations write an audit log entry.
+
+## Cart (guest or user; `@OptionalAuth`)
+
+Guests get an httpOnly `pe_cart` cookie on their first write. On login or
+registration the guest cart is merged into the user's cart (quantities summed
+and capped). Totals are always recomputed server side from current prices and
+availability; unsellable lines are excluded from totals and reported in
+`warnings`.
+
+| Method | Path                  | Notes |
+| ------ | --------------------- | ----- |
+| GET    | `/cart`               | `CartView` (items, coupon, totals, warnings) |
+| POST   | `/cart/items`         | `{ variantId, quantity }` — accumulates, capped by stock and 10 per line |
+| PATCH  | `/cart/items/:itemId` | `{ quantity }` (0 removes) |
+| DELETE | `/cart/items/:itemId` | remove line |
+| DELETE | `/cart`               | empty cart |
+| POST   | `/cart/coupon`        | `{ code }` — validated (active, dates, limits, minimum) |
+| DELETE | `/cart/coupon`        | remove coupon |
+
+## Checkout (user)
+
+| Method | Path                         | Notes |
+| ------ | ---------------------------- | ----- |
+| GET    | `/checkout/shipping-methods` | active methods with the fee for the current cart (free-shipping thresholds applied) |
+| POST   | `/checkout/validate`         | `{ addressId, shippingMethodCode }` → `CheckoutQuote` with authoritative totals (`subtotal`, `discount`, `shippingFee`, `grandTotal`), `issues`, `canPlaceOrder` |
+
+## Coupons & shipping (admin)
+
+| Method | Path | Permission |
+| ------ | ---- | ---------- |
+| GET/POST | `/admin/coupons` | `discounts.manage` |
+| GET/PATCH/DELETE | `/admin/coupons/:id` | `discounts.manage` |
+| GET | `/admin/shipping-methods` | `orders.view` |
+| POST/PATCH/DELETE | `/admin/shipping-methods[/:id]` | `settings.manage` |

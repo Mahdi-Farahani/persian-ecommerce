@@ -2,10 +2,13 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import type React from 'react';
 import { AuthProvider } from '@/components/auth/auth-provider';
+import { CartProvider } from '@/components/cart/cart-provider';
+import { ToastProvider } from '@/components/ui/toast';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { SiteHeader } from '@/components/layout/site-header';
 import { t } from '@/i18n';
 import { getCurrentUser } from '@/lib/auth/server';
+import { getCart } from '@/lib/cart/server';
 import { env } from '@/lib/env';
 import './globals.css';
 
@@ -39,19 +42,23 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
+  const [user, cart] = await Promise.all([getCurrentUser(), getCart()]);
   return (
     <html lang="fa" dir="rtl" className={`${vazirmatn.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <AuthProvider initialUser={user}>
-          <a href="#main-content" className="skip-link">
-            {t.nav.skipToContent}
-          </a>
-          <SiteHeader />
-          <main id="main-content" className="flex-1">
-            {children}
-          </main>
-          <SiteFooter />
+          <CartProvider initialCart={cart}>
+            <ToastProvider>
+              <a href="#main-content" className="skip-link">
+                {t.nav.skipToContent}
+              </a>
+              <SiteHeader />
+              <main id="main-content" className="flex-1">
+                {children}
+              </main>
+              <SiteFooter />
+            </ToastProvider>
+          </CartProvider>
         </AuthProvider>
       </body>
     </html>

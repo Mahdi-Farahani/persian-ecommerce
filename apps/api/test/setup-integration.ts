@@ -21,3 +21,6 @@ process.env['JWT_ACCESS_SECRET'] = 'integration-test-access-secret-0123456789abc
 process.env['JWT_ACCESS_TTL_SECONDS'] = '900';
 process.env['COOKIE_SECURE'] = 'false';
 process.env['THROTTLE_DISABLED'] = 'true';
+process.env['PAYMENT_ENCRYPTION_KEY'] = 'integration-test-payment-key-0123456789abcdef0123456789';
+process.env['PAYMENT_MOCK_ENABLED'] = 'true';
+process.env['ORDER_PAYMENT_TIMEOUT_MINUTES'] = '30';

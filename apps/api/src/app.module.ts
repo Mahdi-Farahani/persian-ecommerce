@@ -1,13 +1,26 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AttributesModule } from './attributes/attributes.module.js';
 import { AuditModule } from './audit/audit.module.js';
+import { BrandsModule } from './brands/brands.module.js';
+import { CartModule } from './cart/cart.module.js';
+import { CheckoutModule } from './checkout/checkout.module.js';
+import { CouponsModule } from './coupons/coupons.module.js';
+import { PricingModule } from './pricing/pricing.module.js';
+import { ShippingModule } from './shipping/shipping.module.js';
+import { CategoriesModule } from './categories/categories.module.js';
+import { InventoryModule } from './inventory/inventory.module.js';
+import { ProductsModule } from './products/products.module.js';
+import { StorageModule } from './storage/storage.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor.js';
 import { AppConfigService } from './config/app-config.service.js';
 import { AppConfigModule } from './config/config.module.js';
 import { HealthModule } from './health/health.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { OrdersModule } from './orders/orders.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { RbacModule } from './rbac/rbac.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -32,6 +45,19 @@ const DEFAULT_REQUESTS_PER_MINUTE = 300;
     UsersModule,
     AuthModule,
     RbacModule,
+    StorageModule,
+    BrandsModule,
+    CategoriesModule,
+    AttributesModule,
+    InventoryModule,
+    ProductsModule,
+    PricingModule,
+    CouponsModule,
+    ShippingModule,
+    CartModule,
+    CheckoutModule,
+    OrdersModule,
+    ScheduleModule.forRoot(),
   ],
   providers: [
     // Throttling runs first so abusive traffic is rejected before auth work.

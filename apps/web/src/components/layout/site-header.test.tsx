@@ -1,16 +1,61 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { t } from '@/i18n';
+import { useAuthStore } from '@/store/auth-store';
+import { HeaderActions } from './header-actions';
 import { MobileMenu } from './mobile-menu';
-import { SiteHeader } from './site-header';
+import { SearchForm } from './search-form';
 
-describe('SiteHeader', () => {
-  it('renders brand, navigation and search', () => {
-    render(<SiteHeader />);
-    expect(screen.getAllByText(t.app.name).length).toBeGreaterThan(0);
-    expect(screen.getByRole('search')).toBeInTheDocument();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}));
+
+describe('SearchForm', () => {
+  it('submits to the search page without JavaScript', () => {
+    render(<SearchForm />);
+    const form = screen.getByRole('search');
+    expect(form).toHaveAttribute('action', '/search');
+    expect(screen.getByRole('searchbox')).toHaveAttribute('name', 'q');
+  });
+});
+
+describe('HeaderActions', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ user: null, hydrated: true });
+  });
+
+  it('shows the login link for guests and the user menu when signed in', async () => {
+    const { rerender } = render(<HeaderActions />);
+    expect(screen.getByRole('link', { name: new RegExp(t.nav.login) })).toHaveAttribute(
+      'href',
+      '/login',
+    );
     expect(screen.getByRole('link', { name: t.nav.cart })).toHaveAttribute('href', '/cart');
+
+    useAuthStore.setState({
+      user: {
+        id: 'u1',
+        email: 'a@b.co',
+        phone: null,
+        firstName: 'سارا',
+        lastName: 'احمدی',
+        status: 'ACTIVE',
+        emailVerified: false,
+        phoneVerified: false,
+        roles: ['CUSTOMER'],
+        permissions: [],
+        createdAt: '',
+      },
+    });
+    rerender(<HeaderActions />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: t.nav.userMenu }));
+    expect(screen.getByRole('menuitem', { name: t.account.profile })).toHaveAttribute(
+      'href',
+      '/account',
+    );
+    expect(screen.queryByRole('menuitem', { name: t.nav.admin })).not.toBeInTheDocument();
   });
 });
 

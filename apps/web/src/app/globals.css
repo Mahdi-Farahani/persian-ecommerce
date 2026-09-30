@@ -40,7 +40,6 @@ body {
   background-color: var(--color-surface-muted);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-feature-settings: 'ss01';
   min-height: 100dvh;
 }
 

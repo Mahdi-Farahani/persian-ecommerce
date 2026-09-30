@@ -16,6 +16,8 @@ export function configureApp(app: NestExpressApplication): INestApplication {
   const config = app.get(AppConfigService);
 
   app.set('trust proxy', config.trustProxy ? 1 : false);
+  // Nested query strings (attr[color]=black) for catalogue filters.
+  app.set('query parser', 'extended');
   app.disable('x-powered-by');
 
   app.use(requestIdMiddleware);
@@ -38,6 +40,14 @@ export function configureApp(app: NestExpressApplication): INestApplication {
   });
 
   app.setGlobalPrefix(config.globalPrefix, { exclude: ['health', 'health/ready'] });
+  // Locally stored uploads (images) are public, immutable objects.
+  app.useStaticAssets(config.uploadsDir, {
+    prefix: '/uploads/',
+    maxAge: '30d',
+    immutable: true,
+    index: false,
+    dotfiles: 'deny',
+  });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: undefined });
 
   app.useGlobalPipes(

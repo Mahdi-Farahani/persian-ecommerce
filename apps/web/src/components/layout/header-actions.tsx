@@ -1,12 +1,14 @@
 'use client';
 
-import { displayName, hasPermission, hasRole } from '@pe/shared';
+import { displayName, hasRole, toPersianDigits } from '@pe/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { t } from '@/i18n';
 import { browserApi } from '@/lib/api/client';
+import { canAccessAdmin } from '@/lib/admin/navigation';
 import { useAuthStore } from '@/store/auth-store';
+import { selectItemCount, useCartStore } from '@/store/cart-store';
 
 /**
  * Account and cart entry points. Renders the login link for guests and a
@@ -14,6 +16,7 @@ import { useAuthStore } from '@/store/auth-store';
  */
 export function HeaderActions() {
   const user = useAuthStore((state) => state.user);
+  const itemCount = useCartStore(selectItemCount);
   return (
     <div className="ms-auto flex items-center gap-2 sm:gap-3">
       {user ? (
@@ -35,6 +38,11 @@ export function HeaderActions() {
         className="relative grid size-10 place-items-center rounded-lg border border-border transition hover:border-brand-400 hover:text-brand-700"
       >
         <CartIcon />
+        {itemCount > 0 ? (
+          <span className="absolute -end-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full bg-accent-500 px-1 text-[11px] font-bold text-white tabular-nums">
+            {toPersianDigits(itemCount)}
+          </span>
+        ) : null}
       </Link>
     </div>
   );
@@ -82,7 +90,7 @@ function UserMenu() {
     { href: '/account/addresses', label: t.account.addresses },
     { href: '/account/security', label: t.account.security },
   ];
-  if (hasPermission(user, 'catalog.view') || hasPermission(user, 'users.view')) {
+  if (canAccessAdmin(user)) {
     links.push({ href: '/admin', label: t.nav.admin });
   }
   if (hasRole(user, 'SELLER')) {

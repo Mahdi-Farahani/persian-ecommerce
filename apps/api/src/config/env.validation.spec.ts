@@ -4,6 +4,7 @@ describe('validateEnvironment', () => {
   const base = {
     DATABASE_URL: 'mysql://app:pw@localhost:3306/db',
     JWT_ACCESS_SECRET: 'unit-test-secret-that-is-long-enough-0123456789',
+    PAYMENT_ENCRYPTION_KEY: 'unit-test-payment-key-0123456789abcdef0123456789',
   };
 
   it('applies defaults', () => {

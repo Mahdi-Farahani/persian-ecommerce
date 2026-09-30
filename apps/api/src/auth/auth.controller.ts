@@ -11,6 +11,8 @@ import { Throttle } from '@nestjs/throttler';
 import type { AuthResponse, AuthUser } from '@pe/shared';
 import type { Request, Response } from 'express';
 import { UnauthorizedAppException } from '../common/errors/app.exception.js';
+import { readCartToken } from '../cart/cart.cookies.js';
+import { CartService } from '../cart/cart.service.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import { clearAuthCookies, REFRESH_COOKIE, setAuthCookies } from './auth.cookies.js';
 import { CurrentUser, Public } from './auth.decorators.js';
@@ -38,6 +40,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly config: AppConfigService,
+    private readonly cart: CartService,
   ) {}
 
   @Public()
@@ -52,6 +55,7 @@ export class AuthController {
   ): Promise<AuthResponse> {
     const result = await this.auth.register(dto, clientMetadata(req));
     setAuthCookies(res, this.config.auth, result);
+    await this.mergeGuestCart(req, result.user.id);
     return result;
   }
 
@@ -68,6 +72,7 @@ export class AuthController {
   ): Promise<AuthResponse> {
     const result = await this.auth.login(dto, clientMetadata(req));
     setAuthCookies(res, this.config.auth, result);
+    await this.mergeGuestCart(req, result.user.id);
     return result;
   }
 
@@ -193,6 +198,12 @@ export class AuthController {
     @Body() dto: ConfirmVerificationDto,
   ): Promise<AuthUser> {
     return this.auth.confirmVerification(user, dto);
+  }
+
+  /** A guest cart identified by the `pe_cart` cookie follows the user into their account. */
+  private async mergeGuestCart(req: Request, userId: string): Promise<void> {
+    const token = readCartToken(req);
+    if (token) await this.cart.mergeGuestCart(userId, token);
   }
 
   private refreshCookie(req: Request): string | undefined {

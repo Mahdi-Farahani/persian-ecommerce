@@ -74,6 +74,10 @@ export class EnvironmentVariables {
   @IsBoolean()
   TRUST_PROXY = true;
 
+  /** Directory for locally stored uploads (images). */
+  @IsString()
+  UPLOADS_DIR = 'uploads';
+
   /** Disables application-level rate limiting (integration tests only). */
   @Transform(toBoolean)
   @IsBoolean()
@@ -131,6 +135,30 @@ export class EnvironmentVariables {
   @Min(1)
   @Max(1_440)
   LOGIN_LOCK_MINUTES = 15;
+
+  // --- orders & payments ---------------------------------------------------
+
+  /** Minutes a PENDING_PAYMENT order keeps its stock reservation. */
+  @Transform(toInt)
+  @IsInt()
+  @Min(5)
+  @Max(1_440)
+  ORDER_PAYMENT_TIMEOUT_MINUTES = 30;
+
+  /** Public base URL of the API for provider callbacks (defaults to APP_URL + /api/v1). */
+  @IsOptional()
+  @IsUrl({ require_tld: false, require_protocol: true })
+  API_PUBLIC_URL?: string;
+
+  /** 32-byte key (base64 or hex) used to encrypt payment credentials at rest. */
+  @IsString()
+  @MinLength(32)
+  PAYMENT_ENCRYPTION_KEY: string;
+
+  /** Enables the mock payment provider (development/tests only; refused in production). */
+  @Transform(toBoolean)
+  @IsBoolean()
+  PAYMENT_MOCK_ENABLED = false;
 }
 
 export function validateEnvironment(config: Record<string, unknown>): EnvironmentVariables {

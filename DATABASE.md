@@ -345,3 +345,30 @@ Seed scripts must be deterministic and safe to rerun where possible.
   password is generated and printed once.
 * Integration tests use a separate `<database>_test` schema created and
   migrated automatically by the vitest global setup.
+
+## Catalog (as built)
+
+* `categories.path` is a materialised path of ancestor ids (`/id1/id2/`) with
+  `depth`; subtree queries use `path LIKE '<path><id>/%'`. Maximum depth 6.
+* Attributes are either informational (`product_attribute_values`) or
+  variant-defining (`attributes.isVariant`, `variant_attribute_values`).
+  `category_attributes` links attributes to categories; a category inherits
+  the attributes of its ancestors for filtering.
+* `products.minPrice` / `maxPrice` are denormalised from active variants and
+  recalculated on every variant change (used for price filters and sorting).
+* `inventory` has one row per variant (`stock`, `reserved`, threshold);
+  `inventory_transactions` is an append-only ledger (`stockAfter`,
+  `reservedAfter` snapshots). Stock mutations lock the row with
+  `SELECT … FOR UPDATE`.
+* Images are stored by the storage provider (local disk under `UPLOADS_DIR`,
+  served at `/uploads/*`); the database keeps only the URL.
+
+## Cart & checkout (as built)
+
+* `carts` belong to a user (`userId`) or to a guest session (`sessionHash`,
+  SHA-256 of the cookie token). Status `ACTIVE → MERGED | CONVERTED | ABANDONED`.
+* `cart_items` are unique per `(cartId, variantId)` and remember `priceAtAdd`
+  so price changes can be surfaced.
+* `coupons`: `PERCENTAGE` (0-100) or `FIXED` (IRR) with optional cap, minimum
+  cart amount, validity window and usage limits.
+* `shipping_methods`: flat `baseFee` with optional `freeAboveAmount`.

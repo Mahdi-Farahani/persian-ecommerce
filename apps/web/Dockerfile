@@ -34,7 +34,11 @@ FROM deps AS build
 # Browser-facing API base URL is inlined at build time. It defaults to the
 # same-origin path served by nginx so one image works for every hostname.
 ARG NEXT_PUBLIC_API_URL=/api/v1
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# Internal API origin used by next.config.ts rewrites (/uploads → API); the
+# compose service name is stable so it is safe to bake in at build time.
+ARG API_INTERNAL_URL=http://api:4000/api/v1
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    API_INTERNAL_URL=${API_INTERNAL_URL}
 COPY packages/shared packages/shared
 COPY apps/web apps/web
 RUN pnpm --filter @pe/shared build \

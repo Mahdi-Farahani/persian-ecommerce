@@ -20,7 +20,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "strictPropertyInitialization": false,
-    "types": ["vitest/globals", "node"],
+    "types": ["vitest/globals", "node", "multer"],
     "paths": {
       "@/*": ["./src/*"]
     }

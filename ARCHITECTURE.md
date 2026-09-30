@@ -517,3 +517,17 @@ to Toman (÷10) purely for display. See `packages/shared/src/money.ts`.
   `/seller`. The browser API client retries once after a transparent refresh.
 * Notifications: `NotificationProvider` abstraction (email/SMS); the logging
   provider is used until a real transport is configured.
+
+## File storage (as built)
+
+`StorageProvider` (`apps/api/src/storage`) abstracts object storage; the
+`LocalStorageProvider` writes under `UPLOADS_DIR` (a Docker volume) and the
+API serves the files at `/uploads/*` with long cache headers. Uploads are
+decoded with sharp, re-encoded as WebP (max 1600px, metadata stripped) and
+stored under random names, so client-supplied MIME types and file names are
+never trusted. An S3-compatible provider can replace the local one through
+the `STORAGE_PROVIDER` factory without touching business modules.
+
+The web app references uploads by relative path (`/uploads/...`); nginx
+proxies that prefix to the API and `next.config.ts` rewrites it to the API
+origin so the Next.js image optimizer can fetch same-origin sources.

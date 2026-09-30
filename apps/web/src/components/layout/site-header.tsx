@@ -1,5 +1,8 @@
+import type { CategoryNode } from '@pe/shared';
 import Link from 'next/link';
 import { t } from '@/i18n';
+import { getCategoryTree } from '@/lib/catalog/api';
+import { CategoryMenu } from './category-menu';
 import { Container } from './container';
 import { HeaderActions } from './header-actions';
 import { MobileMenu } from './mobile-menu';
@@ -11,11 +14,12 @@ export const primaryNavigation = [
   { href: '/products', label: t.nav.products },
 ] as const;
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const tree: CategoryNode[] = await getCategoryTree();
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
       <Container className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2 sm:gap-x-6 md:h-16 md:flex-nowrap md:py-0">
-        <MobileMenu items={primaryNavigation} />
+        <MobileMenu items={primaryNavigation} categories={tree} />
         <Link
           href="/"
           className="flex shrink-0 items-center gap-2 text-xl font-extrabold text-brand-700"
@@ -37,6 +41,9 @@ export function SiteHeader() {
       <nav aria-label={t.nav.menu} className="hidden border-t border-border bg-surface md:block">
         <Container>
           <ul className="flex h-11 items-center gap-6 text-sm font-medium text-ink-muted">
+            <li>
+              <CategoryMenu categories={tree} />
+            </li>
             {primaryNavigation.map((item) => (
               <li key={item.href}>
                 <Link href={item.href} className="transition-colors hover:text-brand-700">

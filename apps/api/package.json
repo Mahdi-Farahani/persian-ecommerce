@@ -29,6 +29,7 @@
     "@nestjs/core": "12.1.2",
     "@nestjs/jwt": "12.0.2",
     "@nestjs/platform-express": "12.1.2",
+    "@nestjs/schedule": "12.0.2",
     "@nestjs/swagger": "12.0.2",
     "@nestjs/throttler": "6.7.1",
     "@pe/shared": "workspace:*",
@@ -41,9 +42,11 @@
     "dotenv": "18.0.4",
     "helmet": "8.3.0",
     "mariadb": "3.5.4",
+    "multer": "2.4.0",
     "prisma": "7.10.0",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -53,6 +56,7 @@
     "@swc/core": "1.16.13",
     "@types/cookie-parser": "1.4.10",
     "@types/express": "5.0.6",
+    "@types/multer": "2.3.0",
     "@types/node": "22.20.4",
     "@types/supertest": "7.2.1",
     "@vitest/coverage-v8": "5.0.3",

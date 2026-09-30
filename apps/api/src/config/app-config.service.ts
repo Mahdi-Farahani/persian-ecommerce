@@ -1,6 +1,18 @@
+import path from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type EnvironmentVariables, LogLevel, NodeEnvironment } from './env.validation.js';
+
+export interface OrdersConfig {
+  paymentTimeoutMinutes: number;
+}
+
+export interface PaymentsConfig {
+  /** Absolute API base for provider callbacks, e.g. https://shop.example/api/v1 */
+  publicApiUrl: string;
+  encryptionKey: string;
+  mockEnabled: boolean;
+}
 
 export interface AuthConfig {
   accessSecret: string;
@@ -70,8 +82,27 @@ export class AppConfigService {
     return this.config.get('TRUST_PROXY', { infer: true });
   }
 
+  get uploadsDir(): string {
+    return path.resolve(process.cwd(), this.config.get('UPLOADS_DIR', { infer: true }));
+  }
+
   get throttleDisabled(): boolean {
     return this.config.get('THROTTLE_DISABLED', { infer: true });
+  }
+
+  get orders(): OrdersConfig {
+    return {
+      paymentTimeoutMinutes: this.config.get('ORDER_PAYMENT_TIMEOUT_MINUTES', { infer: true }),
+    };
+  }
+
+  get payments(): PaymentsConfig {
+    const explicit = this.config.get('API_PUBLIC_URL', { infer: true });
+    return {
+      publicApiUrl: (explicit ?? `${this.appUrl}/${this.globalPrefix}`).replace(/\/+$/g, ''),
+      encryptionKey: this.config.get('PAYMENT_ENCRYPTION_KEY', { infer: true }),
+      mockEnabled: this.config.get('PAYMENT_MOCK_ENABLED', { infer: true }) && !this.isProduction,
+    };
   }
 
   get auth(): AuthConfig {
