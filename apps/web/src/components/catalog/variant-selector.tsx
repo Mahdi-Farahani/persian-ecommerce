@@ -27,8 +27,13 @@ function matches(variant: VariantDetail, selection: Record<string, string>): boo
  * combination afterwards.
  */
 export function initialVariant(variants: VariantDetail[]): VariantDetail | null {
-  const inStock = variants.filter((v) => v.inStock).sort((a, b) => a.price - b.price);
-  return inStock[0] ?? variants.find((v) => v.isDefault) ?? variants[0] ?? null;
+  // Ignore variants that do not describe every variant-defining attribute
+  // (they could never be reached through the option pickers).
+  const complete = Math.max(0, ...variants.map((v) => v.attributes.length));
+  const eligible = variants.filter((v) => v.attributes.length === complete);
+  const pool = eligible.length > 0 ? eligible : variants;
+  const inStock = pool.filter((v) => v.inStock).sort((a, b) => a.price - b.price);
+  return inStock[0] ?? pool.find((v) => v.isDefault) ?? pool[0] ?? null;
 }
 
 function selectionOf(variant: VariantDetail | null): Record<string, string> {

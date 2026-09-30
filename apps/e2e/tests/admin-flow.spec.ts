@@ -62,6 +62,7 @@ test.describe('admin flow', () => {
 
     // Audit trail records the publish action.
     await page.goto('/admin/audit-logs?entityType=Product&entityId=' + created.id);
-    await expect(page.getByText(/product\./).first()).toBeVisible();
+    // The action filter <select> also lists action names; assert on the table cell.
+    await expect(page.locator('td', { hasText: /product\./ }).first()).toBeVisible();
   });
 });

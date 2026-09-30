@@ -54,10 +54,19 @@ test.describe('seller flow', () => {
     // Offer on a catalogue product (API) shows in the portal and on the storefront.
     const sellerToken = await apiLogin(request, sellerEmail, PASSWORD);
     const product = await request.get(`${API_PREFIX}/products/anker-nano-65w`);
-    const productId = ((await product.json()) as { id: string }).id;
+    const detail = (await product.json()) as {
+      id: string;
+      variants: Array<{ attributes: Array<{ attributeId: string; valueId: string }> }>;
+    };
+    const productId = detail.id;
+    // Offers mirror the product's variant attributes (here: the first variant's colour).
+    const attributeValues = detail.variants[0]!.attributes.map((a) => ({
+      attributeId: a.attributeId,
+      valueId: a.valueId,
+    }));
     const offer = await request.post(`${API_PREFIX}/seller/products/${productId}/offers`, {
       headers: bearer(sellerToken),
-      data: { sku: `E2E-SELLER-${run}`, price: 17_000_000, initialStock: 4 },
+      data: { sku: `E2E-SELLER-${run}`, price: 17_000_000, initialStock: 4, attributeValues },
     });
     expect(offer.ok()).toBeTruthy();
     const variantId = ((await offer.json()) as { variantId: string }).variantId;

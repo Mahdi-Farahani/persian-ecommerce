@@ -162,10 +162,22 @@ describe('Seller marketplace (integration)', () => {
   });
 
   it('lets a seller add an offer that appears on the storefront with the seller identity', async () => {
+    // Offers must mirror the product's variant-defining attributes.
+    const s25 = await http().get('/api/v1/products/samsung-galaxy-s25').expect(200);
+    const attributeValues = (
+      s25.body.variants[0].attributes as Array<{ attributeId: string; valueId: string }>
+    ).map((a) => ({ attributeId: a.attributeId, valueId: a.valueId }));
+    const orphan = await http()
+      .post(`/api/v1/seller/products/${productId}/offers`)
+      .set(sellerA.auth)
+      .send({ sku: `SELLER-A-ORPHAN-${RUN}`, price: 400 * M })
+      .expect(422);
+    expect(orphan.body.error.code).toBe('OFFER_ATTRIBUTES_MISMATCH');
     const created = await http()
       .post(`/api/v1/seller/products/${productId}/offers`)
       .set(sellerA.auth)
       .send({
+        attributeValues,
         sku: `SELLER-A-${RUN}`,
         price: 400 * M,
         compareAtPrice: 450 * M,

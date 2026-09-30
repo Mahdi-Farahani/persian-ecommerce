@@ -20,7 +20,8 @@ test.describe('customer flow', () => {
     const box = page.getByRole('combobox').first();
     await box.fill('سامس');
     await expect(page.locator('[role="listbox"] [role="option"]').first()).toBeVisible();
-    await box.press('Enter');
+    // Enter would open the highlighted suggestion; the button submits the query.
+    await page.getByRole('button', { name: 'جستجو' }).first().click();
     await page.waitForURL(/\/search\?q=/);
     await expect(page.locator('a[href^="/products/"]').first()).toBeVisible();
 

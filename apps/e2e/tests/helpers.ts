@@ -49,8 +49,11 @@ export async function apiLogin(
   identifier: string,
   password: string,
 ): Promise<string> {
-  const res = await request.post(`${API_PREFIX}/auth/login`, { data: { identifier, password } });
-  expect(res.ok(), `login ${identifier}: ${res.status()}`).toBeTruthy();
+  const res = await request.post(`${API_PREFIX}/auth/login`, {
+    data: { identifier, password },
+    headers: { 'X-Requested-With': 'e2e' },
+  });
+  expect(res.ok(), `login ${identifier}: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = (await res.json()) as { accessToken: string };
   return body.accessToken;
 }

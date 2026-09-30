@@ -7,7 +7,7 @@ import {
   type ProductDetail,
   type SellerOfferView,
 } from '@pe/shared';
-import { NotFoundAppException } from '../common/errors/app.exception.js';
+import { NotFoundAppException, UnprocessableAppException } from '../common/errors/app.exception.js';
 import { money, moneyOrNull } from '../common/utils/money.util.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { InventoryService } from '../inventory/inventory.service.js';
@@ -107,6 +107,7 @@ export class SellerCatalogService {
       select: { id: true },
     });
     if (!product) throw new NotFoundAppException('PRODUCT_NOT_FOUND', 'محصول پیدا نشد');
+    await this.assertOfferAttributes(productId, dto.attributeValues ?? []);
     const detail = await this.products.addVariant(
       productId,
       { ...dto, isDefault: false, status: 'ACTIVE' },
@@ -157,6 +158,33 @@ export class SellerCatalogService {
   async transactions(sellerId: string, variantId: string): Promise<InventoryTransactionView[]> {
     await this.requireOffer(sellerId, variantId);
     return this.inventory.transactions(variantId);
+  }
+
+  /**
+   * An offer must describe the same variant-defining attributes as the
+   * product's existing variants, otherwise it can never be selected on the
+   * storefront (and would silently become an orphan).
+   */
+  private async assertOfferAttributes(
+    productId: string,
+    attributeValues: Array<{ attributeId: string }>,
+  ): Promise<void> {
+    const rows = await this.prisma.variantAttributeValue.findMany({
+      where: { variant: { productId } },
+      select: { attributeId: true },
+      distinct: ['attributeId'],
+    });
+    const required = new Set(rows.map((r) => r.attributeId));
+    const given = new Set(attributeValues.map((a) => a.attributeId));
+    const missing = [...required].filter((id) => !given.has(id));
+    const extra = [...given].filter((id) => !required.has(id) && required.size > 0);
+    if (missing.length > 0 || extra.length > 0) {
+      throw new UnprocessableAppException(
+        'OFFER_ATTRIBUTES_MISMATCH',
+        'مقدار همهٔ ویژگی‌های تنوع‌ساز این محصول باید در پیشنهاد مشخص شود',
+        { requiredAttributeIds: [...required] },
+      );
+    }
   }
 
   async requireOffer(sellerId: string, variantId: string): Promise<SellerOfferView> {
