@@ -291,3 +291,32 @@ headers and error envelopes, the CSRF header rule for cookie sessions (and
 its absence for bearer tokens), strict DTO validation (unknown fields,
 ranges, lengths), hostile search input (SQL/boolean-mode/HTML payloads) and
 account-enumeration resistance on login and password reset.
+
+### Release validation (as built, Phase 13)
+
+The release gate is the full regression run below against the final Docker
+images. Every step must be green before tagging; the last run on 2026-09-30
+passed all of them.
+
+| Gate | Command | Result |
+| --- | --- | --- |
+| Format | `pnpm format:check` | clean |
+| Lint | `pnpm lint` | 0 errors, 0 warnings |
+| Types | `pnpm typecheck` | 0 errors |
+| Unit / component | `pnpm test` | shared 14, api 164, web 94 tests |
+| Integration | `pnpm test:integration` | 13 files, 107 tests |
+| Production build | `pnpm build` | api, web, shared |
+| Images | `docker compose build` | api, web |
+| Stack | `docker compose up -d && docker compose ps` | mariadb, api, web, nginx healthy |
+| Migrations | `docker compose exec api npx prisma migrate status` | "Database schema is up to date" |
+| Health | `GET /`, `/api/v1`, `/health`, `/health/ready` through nginx | 200 |
+| Browser E2E | `pnpm test:e2e` | customer, admin and seller flows |
+| Secrets | `git ls-files \| grep -E '(^\|/)\.env'` | only `.env.example` files tracked |
+| Ports | `docker compose config \| grep -A2 ports` | only nginx publishes ports |
+
+Release checklist (from `phases/PHASE-13-e2e-testing.md`): no TypeScript
+errors, no lint errors, no failing tests, no unhealthy Docker service, no
+pending migration, no committed secret, no broken critical flow. Re-run the
+table on every release candidate; the browser suite needs the mock gateway
+switches described above and is therefore run against a staging stack, never
+production.
