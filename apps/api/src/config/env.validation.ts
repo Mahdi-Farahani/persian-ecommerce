@@ -33,6 +33,8 @@ const toBoolean = ({ value }: { value: unknown }): unknown =>
 const toInt = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
 
+const MIN_SECRET_LENGTH = 32;
+
 /**
  * Strongly typed, validated environment. The application refuses to boot
  * when a required variable is missing or malformed.
@@ -71,6 +73,64 @@ export class EnvironmentVariables {
   @Transform(toBoolean)
   @IsBoolean()
   TRUST_PROXY = true;
+
+  /** Disables application-level rate limiting (integration tests only). */
+  @Transform(toBoolean)
+  @IsBoolean()
+  THROTTLE_DISABLED = false;
+
+  // --- authentication -------------------------------------------------------
+
+  /** HMAC secret for access tokens. Must be long and random. */
+  @IsString()
+  @MinLength(MIN_SECRET_LENGTH)
+  JWT_ACCESS_SECRET: string;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(60)
+  @Max(86_400)
+  JWT_ACCESS_TTL_SECONDS = 900;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  REFRESH_TOKEN_TTL_DAYS = 30;
+
+  /** Defaults to true in production. */
+  @Transform(toBoolean)
+  @IsBoolean()
+  @IsOptional()
+  COOKIE_SECURE?: boolean;
+
+  @IsString()
+  @IsOptional()
+  COOKIE_DOMAIN?: string;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(5)
+  @Max(1_440)
+  PASSWORD_RESET_TTL_MINUTES = 30;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  VERIFICATION_CODE_TTL_MINUTES = 10;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(3)
+  @Max(20)
+  LOGIN_MAX_FAILED_ATTEMPTS = 5;
+
+  @Transform(toInt)
+  @IsInt()
+  @Min(1)
+  @Max(1_440)
+  LOGIN_LOCK_MINUTES = 15;
 }
 
 export function validateEnvironment(config: Record<string, unknown>): EnvironmentVariables {

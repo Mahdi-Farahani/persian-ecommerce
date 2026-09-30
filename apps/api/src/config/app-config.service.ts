@@ -2,6 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type EnvironmentVariables, LogLevel, NodeEnvironment } from './env.validation.js';
 
+export interface AuthConfig {
+  accessSecret: string;
+  accessTtlSeconds: number;
+  refreshTtlDays: number;
+  cookieSecure: boolean;
+  cookieDomain?: string;
+  passwordResetTtlMinutes: number;
+  verificationCodeTtlMinutes: number;
+  loginMaxFailedAttempts: number;
+  loginLockMinutes: number;
+}
+
 /**
  * Typed facade over ConfigService so modules never read raw process.env.
  */
@@ -56,5 +68,25 @@ export class AppConfigService {
 
   get trustProxy(): boolean {
     return this.config.get('TRUST_PROXY', { infer: true });
+  }
+
+  get throttleDisabled(): boolean {
+    return this.config.get('THROTTLE_DISABLED', { infer: true });
+  }
+
+  get auth(): AuthConfig {
+    return {
+      accessSecret: this.config.get('JWT_ACCESS_SECRET', { infer: true }),
+      accessTtlSeconds: this.config.get('JWT_ACCESS_TTL_SECONDS', { infer: true }),
+      refreshTtlDays: this.config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true }),
+      cookieSecure: this.config.get('COOKIE_SECURE', { infer: true }) ?? this.isProduction,
+      cookieDomain: this.config.get('COOKIE_DOMAIN', { infer: true }) || undefined,
+      passwordResetTtlMinutes: this.config.get('PASSWORD_RESET_TTL_MINUTES', { infer: true }),
+      verificationCodeTtlMinutes: this.config.get('VERIFICATION_CODE_TTL_MINUTES', {
+        infer: true,
+      }),
+      loginMaxFailedAttempts: this.config.get('LOGIN_MAX_FAILED_ATTEMPTS', { infer: true }),
+      loginLockMinutes: this.config.get('LOGIN_LOCK_MINUTES', { infer: true }),
+    };
   }
 }

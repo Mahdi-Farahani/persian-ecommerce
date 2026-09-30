@@ -244,3 +244,53 @@ Example:
   }
 }
 ```
+
+---
+
+# As-built endpoint reference
+
+Base URL `/api/v1`. Errors use `{ success: false, error: { code, message, details? } }`.
+Authentication: `Authorization: Bearer <accessToken>` **or** the httpOnly
+cookies `pe_access` / `pe_refresh` set by the auth endpoints. Cookie-based
+state-changing requests must send `X-Requested-With` (CSRF protection).
+
+## Auth (`/auth`)
+
+| Method | Path                     | Auth   | Notes |
+| ------ | ------------------------ | ------ | ----- |
+| POST   | `/auth/register`         | public | email or phone + password; returns user + tokens, sets cookies |
+| POST   | `/auth/login`            | public | `identifier` (email/mobile) + `password`; lockout after repeated failures (423) |
+| POST   | `/auth/refresh`          | public | rotates refresh token (cookie or body); reuse outside a 30 s grace window revokes the session family |
+| POST   | `/auth/logout`           | public | revokes current session, clears cookies |
+| POST   | `/auth/logout-all`       | user   | revokes every session |
+| GET    | `/auth/me`               | user   | current principal (roles + permissions) |
+| POST   | `/auth/change-password`  | user   | revokes other sessions |
+| POST   | `/auth/forgot-password`  | public | always 200; sends reset link via notification provider |
+| POST   | `/auth/reset-password`   | public | one-time token; revokes all sessions |
+| POST   | `/auth/verification/request` | user | sends 6-digit code (EMAIL/PHONE) |
+| POST   | `/auth/verification/confirm` | user | max 5 attempts per code |
+
+## Users (`/users/me`)
+
+| Method | Path                         | Notes |
+| ------ | ---------------------------- | ----- |
+| GET    | `/users/me`                  | profile |
+| PATCH  | `/users/me`                  | firstName / lastName |
+| GET    | `/users/me/addresses`        | default first |
+| POST   | `/users/me/addresses`        | max 10; first becomes default |
+| GET    | `/users/me/addresses/:id`    | owner only |
+| PATCH  | `/users/me/addresses/:id`    | owner only |
+| DELETE | `/users/me/addresses/:id`    | owner only; promotes another default |
+
+## Admin users & RBAC (`/admin`)
+
+| Method | Path                        | Permission     |
+| ------ | --------------------------- | -------------- |
+| GET    | `/admin/users`              | `users.view`   |
+| GET    | `/admin/users/:id`          | `users.view`   |
+| PATCH  | `/admin/users/:id/status`   | `users.manage` (audited) |
+| PATCH  | `/admin/users/:id/roles`    | `users.manage`; granting ADMIN/SUPER_ADMIN or touching privileged accounts requires `roles.manage` (audited) |
+| GET    | `/admin/roles`              | `users.view`   |
+| GET    | `/admin/permissions`        | `users.view`   |
+
+Permission keys are defined in `apps/api/src/rbac/permissions.ts`.

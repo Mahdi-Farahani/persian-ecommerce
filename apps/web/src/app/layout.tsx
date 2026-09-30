@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
-import type React from 'react';
 import localFont from 'next/font/local';
+import type React from 'react';
+import { AuthProvider } from '@/components/auth/auth-provider';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { SiteHeader } from '@/components/layout/site-header';
 import { t } from '@/i18n';
+import { getCurrentUser } from '@/lib/auth/server';
 import { env } from '@/lib/env';
 import './globals.css';
 
@@ -36,18 +38,21 @@ export const viewport: Viewport = {
   themeColor: '#1b5cf5',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const user = await getCurrentUser();
   return (
     <html lang="fa" dir="rtl" className={`${vazirmatn.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        <a href="#main-content" className="skip-link">
-          {t.nav.skipToContent}
-        </a>
-        <SiteHeader />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
-        <SiteFooter />
+        <AuthProvider initialUser={user}>
+          <a href="#main-content" className="skip-link">
+            {t.nav.skipToContent}
+          </a>
+          <SiteHeader />
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
+          <SiteFooter />
+        </AuthProvider>
       </body>
     </html>
   );

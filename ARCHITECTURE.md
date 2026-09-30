@@ -492,3 +492,28 @@ Package manager: pnpm workspaces (`pnpm-workspace.yaml`). All versions are pinne
 
 Amounts are integers in Iranian Rial (IRR), stored as `BIGINT`. The UI converts
 to Toman (÷10) purely for display. See `packages/shared/src/money.ts`.
+
+## Authentication (as built)
+
+* Passwords: Argon2id (19 MiB, t=2). Login by email or Iranian mobile number.
+* Access token: HS256 JWT, 15 min (`JWT_ACCESS_TTL_SECONDS`), payload
+  `{ sub, sid (session family), type }`. Verified on every request together
+  with a live-session check, so logout/suspension take effect immediately.
+* Refresh token: opaque 48-byte random value, stored SHA-256 hashed in
+  `refresh_sessions`, rotated on every use. Rotated tokens are tolerated for
+  30 s (parallel requests); later reuse revokes the whole family.
+* Cookies: `pe_access` and `pe_refresh` are httpOnly, SameSite=Lax, Secure in
+  production. Tokens are also returned in the login body for non-browser clients.
+* CSRF: cookie-authenticated non-GET requests must carry `X-Requested-With`
+  (custom headers require a CORS preflight, which is restricted to
+  `CORS_ORIGINS`) or an allowed `Origin`.
+* Brute force: `LOGIN_MAX_FAILED_ATTEMPTS` failures lock the account for
+  `LOGIN_LOCK_MINUTES`; auth endpoints have stricter throttling.
+* Authorization: global `JwtAuthGuard` (routes protected by default,
+  `@Public()` / `@OptionalAuth()` opt out) + `PermissionsGuard`
+  (`@RequirePermissions()`, `@Roles()`); SUPER_ADMIN bypasses permission checks.
+* Web: `src/proxy.ts` refreshes an expired access cookie before rendering and
+  redirects anonymous visitors away from `/account`, `/checkout`, `/admin`,
+  `/seller`. The browser API client retries once after a transparent refresh.
+* Notifications: `NotificationProvider` abstraction (email/SMS); the logging
+  provider is used until a real transport is configured.

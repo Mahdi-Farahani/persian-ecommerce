@@ -1,7 +1,10 @@
 import { validateEnvironment } from './env.validation.js';
 
 describe('validateEnvironment', () => {
-  const base = { DATABASE_URL: 'mysql://app:pw@localhost:3306/db' };
+  const base = {
+    DATABASE_URL: 'mysql://app:pw@localhost:3306/db',
+    JWT_ACCESS_SECRET: 'unit-test-secret-that-is-long-enough-0123456789',
+  };
 
   it('applies defaults', () => {
     const env = validateEnvironment({ ...base });
@@ -18,6 +21,12 @@ describe('validateEnvironment', () => {
 
   it('rejects a missing database url', () => {
     expect(() => validateEnvironment({})).toThrow(/DATABASE_URL/);
+  });
+
+  it('rejects a short jwt secret', () => {
+    expect(() => validateEnvironment({ ...base, JWT_ACCESS_SECRET: 'short' })).toThrow(
+      /JWT_ACCESS_SECRET/,
+    );
   });
 
   it('rejects invalid node env', () => {

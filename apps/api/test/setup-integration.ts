@@ -17,3 +17,7 @@ process.env['SWAGGER_ENABLED'] = 'false';
 process.env['LOG_LEVEL'] = 'error';
 process.env['APP_URL'] = 'http://localhost:3000';
 process.env['CORS_ORIGINS'] = 'http://localhost:3000';
+process.env['JWT_ACCESS_SECRET'] = 'integration-test-access-secret-0123456789abcdef';
+process.env['JWT_ACCESS_TTL_SECONDS'] = '900';
+process.env['COOKIE_SECURE'] = 'false';
+process.env['THROTTLE_DISABLED'] = 'true';

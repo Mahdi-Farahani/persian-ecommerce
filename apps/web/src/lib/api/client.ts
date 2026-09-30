@@ -49,6 +49,7 @@ export async function request<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    // Custom header doubles as the CSRF token for cookie-authenticated calls.
     'X-Requested-With': 'fetch',
     ...options.headers,
   };
@@ -67,7 +68,12 @@ export async function request<T>(
   if (options.cache) init.cache = options.cache;
   if (options.next) init.next = options.next;
 
-  const response = await fetch(buildUrl(base, path, options.query), init);
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(base, path, options.query), init);
+  } catch (error) {
+    throw new ApiError(0, 'NETWORK_ERROR', 'ارتباط با سرور برقرار نشد', error);
+  }
   const payload = await parseBody(response);
   if (!response.ok) {
     throw ApiError.fromBody(response.status, payload);
@@ -75,16 +81,53 @@ export async function request<T>(
   return payload as T;
 }
 
+// ---------------------------------------------------------------------------
+// Browser client with transparent access-token refresh
+// ---------------------------------------------------------------------------
+
+const AUTH_PATHS_WITHOUT_RETRY = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'];
+
+let refreshInFlight: Promise<boolean> | null = null;
+
+/** Rotates the session via the refresh cookie; concurrent callers share one request. */
+async function refreshSession(): Promise<boolean> {
+  refreshInFlight ??= request<unknown>(env.publicApiUrl, '/auth/refresh', {
+    method: 'POST',
+    body: {},
+  })
+    .then(() => true)
+    .catch(() => false)
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
+}
+
+async function browserRequest<T>(path: string, options: RequestOptions): Promise<T> {
+  try {
+    return await request<T>(env.publicApiUrl, path, options);
+  } catch (error) {
+    const retryable =
+      error instanceof ApiError &&
+      error.isUnauthorized &&
+      !AUTH_PATHS_WITHOUT_RETRY.some((p) => path.startsWith(p));
+    if (!retryable) throw error;
+    const refreshed = await refreshSession();
+    if (!refreshed) throw error;
+    return request<T>(env.publicApiUrl, path, options);
+  }
+}
+
 /** API client for browser (Client Components). Cookies are sent automatically. */
 export const browserApi = {
   get: <T>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(env.publicApiUrl, path, { ...options, method: 'GET' }),
+    browserRequest<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(env.publicApiUrl, path, { ...options, method: 'POST', body }),
+    browserRequest<T>(path, { ...options, method: 'POST', body }),
   patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(env.publicApiUrl, path, { ...options, method: 'PATCH', body }),
+    browserRequest<T>(path, { ...options, method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(env.publicApiUrl, path, { ...options, method: 'PUT', body }),
+    browserRequest<T>(path, { ...options, method: 'PUT', body }),
   delete: <T>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(env.publicApiUrl, path, { ...options, method: 'DELETE' }),
+    browserRequest<T>(path, { ...options, method: 'DELETE' }),
 };

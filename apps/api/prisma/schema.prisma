@@ -28,20 +28,27 @@ enum UserStatus {
 }
 
 model User {
-  id              String     @id @default(uuid(7)) @db.Char(36)
-  email           String?    @unique @db.VarChar(255)
-  phone           String?    @unique @db.VarChar(20)
-  passwordHash    String     @db.VarChar(255)
-  firstName       String?    @db.VarChar(100)
-  lastName        String?    @db.VarChar(100)
-  status          UserStatus @default(ACTIVE)
-  emailVerifiedAt DateTime?
-  phoneVerifiedAt DateTime?
-  lastLoginAt     DateTime?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  id               String     @id @default(uuid(7)) @db.Char(36)
+  email            String?    @unique @db.VarChar(255)
+  phone            String?    @unique @db.VarChar(20)
+  passwordHash     String     @db.VarChar(255)
+  firstName        String?    @db.VarChar(100)
+  lastName         String?    @db.VarChar(100)
+  status           UserStatus @default(ACTIVE)
+  emailVerifiedAt  DateTime?
+  phoneVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
-  roles UserRole[]
+  roles               UserRole[]
+  refreshSessions     RefreshSession[]
+  passwordResetTokens PasswordResetToken[]
+  verificationCodes   VerificationCode[]
+  addresses           Address[]
+  auditLogs           AuditLog[]
 
   @@index([status])
   @@index([createdAt])
@@ -98,4 +105,116 @@ model RolePermission {
   @@id([roleId, permissionId])
   @@index([permissionId])
   @@map("role_permissions")
+}
+
+// ---------------------------------------------------------------------------
+// Authentication: refresh sessions, password reset, verification codes
+// ---------------------------------------------------------------------------
+
+model RefreshSession {
+  id         String    @id @default(uuid(7)) @db.Char(36)
+  userId     String    @db.Char(36)
+  /// SHA-256 hash of the opaque refresh token; the raw token is never stored.
+  tokenHash  String    @unique @db.Char(64)
+  /// Groups rotated tokens so reuse of an old token revokes the whole chain.
+  familyId   String    @db.Char(36)
+  userAgent  String?   @db.VarChar(255)
+  ipAddress  String?   @db.VarChar(45)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid(7)) @db.Char(36)
+  userId    String    @db.Char(36)
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+enum VerificationChannel {
+  EMAIL
+  PHONE
+}
+
+model VerificationCode {
+  id         String              @id @default(uuid(7)) @db.Char(36)
+  userId     String              @db.Char(36)
+  channel    VerificationChannel
+  target     String              @db.VarChar(255)
+  codeHash   String              @db.Char(64)
+  attempts   Int                 @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel])
+  @@map("verification_codes")
+}
+
+// ---------------------------------------------------------------------------
+// Addresses
+// ---------------------------------------------------------------------------
+
+model Address {
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  userId         String   @db.Char(36)
+  title          String   @db.VarChar(100)
+  recipientName  String   @db.VarChar(150)
+  recipientPhone String   @db.VarChar(20)
+  province       String   @db.VarChar(100)
+  city           String   @db.VarChar(100)
+  addressLine    String   @db.VarChar(500)
+  postalCode     String   @db.Char(10)
+  latitude       Decimal? @db.Decimal(9, 6)
+  longitude      Decimal? @db.Decimal(9, 6)
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+// ---------------------------------------------------------------------------
+// Audit log for sensitive administrative actions
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid(7)) @db.Char(36)
+  actorId    String?  @db.Char(36)
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(100)
+  entityId   String?  @db.VarChar(64)
+  metadata   Json?
+  ipAddress  String?  @db.VarChar(45)
+  userAgent  String?  @db.VarChar(255)
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
