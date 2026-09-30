@@ -163,3 +163,18 @@ whose keys look like passwords, secrets, tokens or credentials.
   `package.json` when upstream fixes are not yet released.
 * Change the bootstrap admin password after the first login and create
   named administrator accounts instead of sharing it.
+
+## 12. Production verification (as built)
+
+Verified on the Compose stack before release (repeat on the real host):
+
+| Control | How it is verified |
+| --- | --- |
+| HTTPS | `tls.conf.example` (TLS 1.2/1.3, HSTS, HTTP→HTTPS redirect); `curl -I http://host` returns `301` |
+| Security headers | `curl -I https://host/` and `/api/v1/products`: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` once each (nginx is the single source; upstream copies are hidden), `server_tokens off`, no `X-Powered-By` |
+| No debug mode | API container runs `NODE_ENV=production`; `/api/docs` returns `404` with `SWAGGER_ENABLED=false`; error envelopes carry `requestId`, never stack traces |
+| No secrets in git | `git ls-files | grep -E '(^|/)\.env'` lists only `.env.example` files; `infra/nginx/certs` and `infra/docker/certs` are git-ignored |
+| No exposed database | `docker compose config` publishes ports only on `nginx`; MariaDB sits on the `backend` network without a host port |
+| No unnecessary ports | `80`/`443` only; `ss -ltnp` on the host shows nothing else from the stack |
+| Restricted admin access | `/admin` and `/api/v1/admin/*` require ADMIN/SUPER_ADMIN (authorization matrix test); add an IP allow-list to the nginx `location /admin` for defence in depth |
+| Mock gateway | refused at runtime when `NODE_ENV=production` regardless of `.env` |

@@ -282,6 +282,113 @@ Payments (see `docs/payments/README.md`):
   `ZARINPAL_ENVIRONMENT`, `ZARINPAL_MERCHANT_ID`. Afterwards configure
   gateways at `/admin/settings/payment-gateways`.
 
+## Deployment procedure (as built)
+
+First deployment on a fresh Linux host (Docker Engine ≥ 24 with Compose v2):
+
+```bash
+git clone <repository> /srv/persian-ecommerce && cd /srv/persian-ecommerce
+git checkout development
+cp .env.example .env
+# edit .env: MARIADB_ROOT_PASSWORD, MARIADB_PASSWORD, JWT_ACCESS_SECRET,
+# PAYMENT_ENCRYPTION_KEY, SEED_ADMIN_PASSWORD, APP_URL=https://shop.example.com,
+# CORS_ORIGINS=https://shop.example.com, COOKIE_SECURE=true,
+# NGINX_HTTP_PORT=80, NGINX_HTTPS_PORT=443
+cp infra/nginx/conf.d/tls.conf.example infra/nginx/conf.d/default.conf   # set server_name
+# place fullchain.pem / privkey.pem in infra/nginx/certs/
+docker compose build
+docker compose up -d
+docker compose ps                      # every service "healthy"
+```
+
+Every later release:
+
+```bash
+cd /srv/persian-ecommerce
+infra/scripts/backup-db.sh /srv/backups   # always before a migration
+git pull origin development
+docker compose build
+docker compose up -d                       # api applies migrations, then web/nginx roll
+docker compose ps
+docker compose logs --since 5m api
+```
+
+Post-deployment smoke (replace the origin):
+
+```bash
+curl -fsS https://shop.example.com/health/ready     # {"status":"ok",...,"database":{"status":"up"}}
+curl -fsS https://shop.example.com/api/v1           # API identity and version
+curl -fsS -o /dev/null -w '%{http_code}\n' https://shop.example.com/            # 200
+curl -fsS -o /dev/null -w '%{http_code}\n' https://shop.example.com/products    # 200
+curl -fsS 'https://shop.example.com/api/v1/products?limit=1' | head -c 200      # catalogue JSON
+docker compose exec api npx prisma migrate status   # "Database schema is up to date"
+```
+
+Then log in to `/admin` and check the dashboard loads. Rotate the bootstrap
+admin password on first login.
+
+## Rollback (as built)
+
+Images are tagged with `IMAGE_TAG` (default `latest`); build releases with an
+explicit tag so the previous one stays available:
+
+```bash
+IMAGE_TAG=2026.09.30 docker compose build
+IMAGE_TAG=2026.09.30 docker compose up -d
+```
+
+To roll back the application, redeploy the previous tag with migrations
+disabled so the older code never runs against a schema it does not know
+about:
+
+```bash
+RUN_MIGRATIONS_ON_START=false IMAGE_TAG=2026.09.29 docker compose up -d api web
+```
+
+Migrations are additive whenever possible (new nullable columns, new
+tables), so the previous release usually keeps working on the newer schema.
+When a migration is destructive the release notes must say so; in that case
+rollback means restoring the pre-deployment dump with
+`infra/scripts/restore-db.sh` (which stops `api`/`web`, restores, and starts
+them again) and then starting the previous images. Never assume a schema can
+be rolled back without a backup.
+
+## Logging (as built)
+
+All services log to stdout/stderr through Docker's `json-file` driver with
+rotation (`10m` × 5 files per container, set once in `docker-compose.yml`).
+Read them with `docker compose logs -f [service]`. The API uses the Nest
+logger with `LOG_LEVEL` (`error`, `warn`, `log`, `debug`, `verbose`); each
+request carries the nginx `X-Request-Id`, which is echoed in error envelopes
+so a user report can be matched to the log line. Nginx access logs include the
+upstream time; `/health*` and `/uploads/` are not access-logged. Ship the
+json files with a collector (Promtail, Filebeat, Vector) when centralised
+logs are needed; nothing in the stack writes log files to disk.
+
+## Production checklist (as built)
+
+Before exposing a deployment:
+
+- [ ] `NODE_ENV` of the API container is `production` (do not set
+      `API_NODE_ENV` in `.env`), `SWAGGER_ENABLED=false`,
+      `PAYMENT_MOCK_ENABLED=false`, `LOG_LEVEL=log` or `warn`.
+- [ ] TLS configured (`tls.conf.example`), HTTP redirects to HTTPS, HSTS
+      on, `COOKIE_SECURE=true`, `APP_URL`/`API_PUBLIC_URL`/`CORS_ORIGINS` set
+      to the public HTTPS origin.
+- [ ] Secrets only in `.env` on the host (mode `600`) or a secrets manager;
+      `git status` shows no `.env`.
+- [ ] Only nginx publishes ports (`docker compose config | grep -A2 ports`);
+      MariaDB and the API are reachable solely on the internal networks.
+- [ ] `/admin` restricted at the network level (IP allow-list or VPN in the
+      nginx server block) in addition to RBAC.
+- [ ] Bootstrap admin password rotated, named admin accounts created.
+- [ ] Payment gateways configured with production credentials at
+      `/admin/settings/payment-gateways`; callback URLs registered with the
+      providers; the `contractDocsConfirmed` setting left unset until the
+      BNPL adapters are verified against contract documents.
+- [ ] Backup cron installed and one restore rehearsed.
+- [ ] Smoke checks above green, `pnpm audit --prod` clean at build time.
+
 ## TLS
 
 Copy `infra/nginx/conf.d/tls.conf.example` over `default.conf`, place

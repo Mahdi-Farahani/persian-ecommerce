@@ -86,8 +86,22 @@ Nginx listens on `NGINX_HTTP_PORT` (default 80). Routes:
 - `/api/docs` → Swagger UI (only when `SWAGGER_ENABLED=true`)
 
 The API container applies migrations on start (`RUN_MIGRATIONS_ON_START`) and
-optionally seeds base data (`SEED_ON_START`). See `DEPLOYMENT.md` for TLS,
-backups and rollback.
+optionally seeds base data (`SEED_ON_START`).
+
+## Production deployment
+
+```bash
+git pull origin development
+docker compose build
+docker compose up -d
+curl -fsS https://<host>/health/ready && curl -fsS https://<host>/api/v1
+```
+
+`DEPLOYMENT.md` covers the first install, TLS, release and rollback
+procedure, logging, backups/restore and the production checklist;
+`SECURITY.md` documents the security controls and their verification;
+`TESTING.md` the release gate. Health endpoints: `/` (storefront),
+`/api/v1` (API identity), `/health` (liveness), `/health/ready` (database).
 
 ## Payments
 
