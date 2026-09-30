@@ -49,14 +49,19 @@ export function buildSearchText(input: SearchTextInput): string {
 
 /** Normalises and splits a query into at most `max` tokens. */
 export function tokenize(query: string, max = MAX_TOKENS): string[] {
-  return normalizePersian(query)
-    .toLowerCase()
-    .replace(ZWNJ, ' ')
-    .replace(BOOLEAN_OPERATORS, ' ')
-    .split(/[\s,،;؛.!?؟/\\|]+/)
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0)
-    .slice(0, max);
+  return (
+    normalizePersian(query)
+      .toLowerCase()
+      .replace(ZWNJ, ' ')
+      .replace(BOOLEAN_OPERATORS, ' ')
+      // Only letters, digits, underscore and hyphen may reach the FULLTEXT
+      // parser; anything else (%, quotes, punctuation) is a separator.
+      .replace(/[^\p{L}\p{N}_-]+/gu, ' ')
+      .split(/\s+/)
+      .map((t) => t.trim().replace(/^-+|-+$/g, ''))
+      .filter((t) => t.length > 0)
+      .slice(0, max)
+  );
 }
 
 /**

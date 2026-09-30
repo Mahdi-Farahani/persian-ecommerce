@@ -96,7 +96,8 @@ export class SearchService {
 
   /** Header autocomplete: a few products, categories and brands. */
   async suggest(rawQuery: string): Promise<SearchSuggestions> {
-    const query = normalizePersian(rawQuery).slice(0, 100);
+    // Echoed back to the client; keep it free of markup-significant characters.
+    const query = normalizePersian(rawQuery).replace(/[<>]/g, '').slice(0, 100);
     const tokens = tokenize(query);
     const result: SearchSuggestions = { query, products: [], categories: [], brands: [] };
     if (query.length < SEARCH_SUGGEST_MIN_LENGTH || tokens.length === 0) return result;

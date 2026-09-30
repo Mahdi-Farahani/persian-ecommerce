@@ -63,8 +63,9 @@ test.describe('customer flow', () => {
     await page.goto('/products/samsung-galaxy-s25');
     const write = page.getByRole('button', { name: /ثبت نظر|نوشتن نظر/ }).first();
     if (await write.count()) await write.click();
-    const stars = page.getByRole('radio', { name: /۵|5/ }).first();
-    if (await stars.count()) await stars.check({ force: true });
+    // The star inputs are visually hidden; click their labels.
+    const star = page.locator('label', { has: page.getByRole('radio', { name: /۵/ }) }).first();
+    if (await star.count()) await star.click();
     const title = page.locator('input[name="title"]').first();
     if (await title.count()) {
       await title.fill('عالی بود');

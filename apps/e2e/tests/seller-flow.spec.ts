@@ -16,7 +16,11 @@ import {
  * visible in the portal.
  */
 test.describe('seller flow', () => {
-  test('sells, fulfils and gets settled', async ({ page, request }) => {
+  test('sells, fulfils and gets settled', async ({ page, playwright, baseURL }) => {
+    // One API context per actor so session cookies set by login/register never mix.
+    const adminApi = await playwright.request.newContext({ baseURL });
+    const sellerApi = await playwright.request.newContext({ baseURL });
+    const customerApi = await playwright.request.newContext({ baseURL });
     const run = Date.now().toString(36);
     const sellerEmail = uniqueEmail('seller');
     await registerViaUi(page, sellerEmail);
@@ -30,8 +34,8 @@ test.describe('seller flow', () => {
 
     // Admin approves (API) and the seller re-logs to pick up the role.
     const admin = adminCredentials();
-    const adminToken = await apiLogin(request, admin.email, admin.password);
-    const sellers = await request.get(
+    const adminToken = await apiLogin(adminApi, admin.email, admin.password);
+    const sellers = await adminApi.get(
       `${API_PREFIX}/admin/sellers?status=PENDING&search=${encodeURIComponent(sellerEmail)}`,
       {
         headers: bearer(adminToken),
@@ -40,7 +44,7 @@ test.describe('seller flow', () => {
     const pending = ((await sellers.json()) as { items: Array<{ id: string }> }).items;
     expect(pending.length).toBe(1);
     const sellerId = pending[0]!.id;
-    const approved = await request.patch(`${API_PREFIX}/admin/sellers/${sellerId}/status`, {
+    const approved = await adminApi.patch(`${API_PREFIX}/admin/sellers/${sellerId}/status`, {
       headers: bearer(adminToken),
       data: { status: 'APPROVED' },
     });
@@ -52,8 +56,8 @@ test.describe('seller flow', () => {
     await expect(page.getByText(/فروشگاه آزمون/).first()).toBeVisible();
 
     // Offer on a catalogue product (API) shows in the portal and on the storefront.
-    const sellerToken = await apiLogin(request, sellerEmail, PASSWORD);
-    const product = await request.get(`${API_PREFIX}/products/anker-nano-65w`);
+    const sellerToken = await apiLogin(sellerApi, sellerEmail, PASSWORD);
+    const product = await sellerApi.get(`${API_PREFIX}/products/anker-nano-65w`);
     const detail = (await product.json()) as {
       id: string;
       variants: Array<{ attributes: Array<{ attributeId: string; valueId: string }> }>;
@@ -64,7 +68,7 @@ test.describe('seller flow', () => {
       attributeId: a.attributeId,
       valueId: a.valueId,
     }));
-    const offer = await request.post(`${API_PREFIX}/seller/products/${productId}/offers`, {
+    const offer = await sellerApi.post(`${API_PREFIX}/seller/products/${productId}/offers`, {
       headers: bearer(sellerToken),
       data: { sku: `E2E-SELLER-${run}`, price: 17_000_000, initialStock: 4, attributeValues },
     });
@@ -77,11 +81,11 @@ test.describe('seller flow', () => {
 
     // A customer buys the seller's offer (API + mock gateway).
     const customerEmail = uniqueEmail('buyer');
-    const reg = await request.post(`${API_PREFIX}/auth/register`, {
+    const reg = await customerApi.post(`${API_PREFIX}/auth/register`, {
       data: { email: customerEmail, password: PASSWORD, firstName: 'علی', lastName: 'رضایی' },
     });
     const customerToken = ((await reg.json()) as { accessToken: string }).accessToken;
-    const address = await request.post(`${API_PREFIX}/users/me/addresses`, {
+    const address = await customerApi.post(`${API_PREFIX}/users/me/addresses`, {
       headers: bearer(customerToken),
       data: {
         title: 'خانه',
@@ -93,55 +97,63 @@ test.describe('seller flow', () => {
         postalCode: '1234567890',
       },
     });
-    await request.post(`${API_PREFIX}/cart/items`, {
+    const cartAdd = await customerApi.post(`${API_PREFIX}/cart/items`, {
       headers: bearer(customerToken),
       data: { variantId, quantity: 1 },
     });
-    const order = await request.post(`${API_PREFIX}/checkout`, {
+    expect(cartAdd.ok(), `cart: ${cartAdd.status()} ${await cartAdd.text()}`).toBeTruthy();
+    const order = await customerApi.post(`${API_PREFIX}/checkout`, {
       headers: bearer(customerToken),
       data: {
         addressId: ((await address.json()) as { id: string }).id,
         shippingMethodCode: 'post-standard',
       },
     });
-    expect(order.ok()).toBeTruthy();
+    expect(order.ok(), `checkout: ${order.status()} ${await order.text()}`).toBeTruthy();
     const orderId = ((await order.json()) as { id: string }).id;
-    const payment = await request.post(`${API_PREFIX}/payments`, {
+    const payment = await customerApi.post(`${API_PREFIX}/payments`, {
       headers: bearer(customerToken),
       data: { orderId },
     });
     const authority = ((await payment.json()) as { payment: { providerAuthority: string } }).payment
       .providerAuthority;
-    await request.get(`${API_PREFIX}/payments/mock/callback?authority=${authority}&status=OK`, {
+    await customerApi.get(`${API_PREFIX}/payments/mock/callback?authority=${authority}&status=OK`, {
       maxRedirects: 0,
     });
 
     // Seller dispatches through the portal.
     await page.goto(`/seller/orders/${orderId}`);
     await expect(page.getByText(`E2E-SELLER-${run}`)).toBeVisible();
-    await page
-      .getByRole('button', { name: /ثبت مرسوله/ })
-      .first()
-      .click();
+    // The shipment form is rendered inline while the seller still has to dispatch.
     const tracking = page.locator('input[name="trackingCode"]');
-    if (await tracking.count()) await tracking.fill(`TRK-${run}`);
-    await page
-      .getByRole('button', { name: /ثبت مرسوله|ثبت/ })
-      .last()
-      .click();
+    await expect(tracking).toBeVisible();
+    await tracking.fill(`TRK-${run}`);
+    await page.getByRole('button', { name: /ثبت مرسوله/ }).click();
     await expect(page.getByRole('alert').first()).toBeVisible();
+    // The only seller has dispatched, so the order must now be SHIPPED.
+    await expect
+      .poll(async () => {
+        const res = await adminApi.get(`${API_PREFIX}/admin/orders/${orderId}`, {
+          headers: bearer(adminToken),
+        });
+        return ((await res.json()) as { status: string }).status;
+      })
+      .toBe('SHIPPED');
 
     // Delivery and settlement (API), visible in the portal.
-    const delivered = await request.patch(`${API_PREFIX}/admin/orders/${orderId}/status`, {
+    const delivered = await adminApi.patch(`${API_PREFIX}/admin/orders/${orderId}/status`, {
       headers: bearer(adminToken),
       data: { status: 'DELIVERED' },
     });
-    expect(delivered.ok()).toBeTruthy();
-    const settlement = await request.post(`${API_PREFIX}/admin/sellers/${sellerId}/settlements`, {
+    expect(delivered.ok(), `deliver: ${delivered.status()} ${await delivered.text()}`).toBeTruthy();
+    const settlement = await adminApi.post(`${API_PREFIX}/admin/sellers/${sellerId}/settlements`, {
       headers: bearer(adminToken),
       data: { note: 'e2e' },
     });
-    expect(settlement.ok()).toBeTruthy();
+    expect(
+      settlement.ok(),
+      `settle: ${settlement.status()} ${await settlement.text()}`,
+    ).toBeTruthy();
     await page.goto('/seller/settlements');
     await expect(page.getByText('در انتظار پرداخت').first()).toBeVisible();
   });
