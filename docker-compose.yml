@@ -89,6 +89,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Public origin used for canonical URLs, Open Graph and the sitemap.
       APP_URL: ${APP_URL:-http://localhost:8080}
       API_INTERNAL_URL: http://api:4000/api/v1
     depends_on:

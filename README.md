@@ -82,7 +82,7 @@ docker compose ps
 Nginx listens on `NGINX_HTTP_PORT` (default 80). Routes:
 
 - `/` → Next.js
-- `/api/*`, `/health`, `/health/ready` → NestJS
+- `/api/*`, `/health`, `/health/ready` → NestJS (`GET /api/v1` returns the API identity)
 - `/api/docs` → Swagger UI (only when `SWAGGER_ENABLED=true`)
 
 The API container applies migrations on start (`RUN_MIGRATIONS_ON_START`) and

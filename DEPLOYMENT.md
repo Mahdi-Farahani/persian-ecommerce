@@ -82,6 +82,7 @@ Backend:
 ```text
 GET /health
 GET /health/ready
+GET /api/v1          # identity, version and links (JSON)
 ```
 
 Docker health checks should be used where practical.

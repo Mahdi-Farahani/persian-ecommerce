@@ -283,3 +283,11 @@ cart → checkout → mock payment → order history → review),
 `admin-flow.spec.ts` (catalogue creation, publish, inventory, orders,
 dashboard, audit log) and `seller-flow.spec.ts` (application → approval →
 offer → order → fulfilment → settlement).
+
+### Security regression suite (as built)
+
+`apps/api/test/security.integration-spec.ts` checks hardened response
+headers and error envelopes, the CSRF header rule for cookie sessions (and
+its absence for bearer tokens), strict DTO validation (unknown fields,
+ranges, lengths), hostile search input (SQL/boolean-mode/HTML payloads) and
+account-enumeration resistance on login and password reset.

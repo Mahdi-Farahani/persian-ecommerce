@@ -3,7 +3,9 @@ import { env } from '@/lib/env';
 import { getBrands, getCategoryTree, listProducts } from '@/lib/catalog/api';
 import type { CategoryNode, ProductCard } from '@pe/shared';
 
-export const revalidate = 3600;
+// Generated per request (crawlers fetch it rarely); a build-time snapshot
+// would freeze the catalogue and needs the API during `next build`.
+export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 100;
 /** Upper bound so a runaway catalogue cannot make the sitemap unbounded. */

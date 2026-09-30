@@ -17,6 +17,15 @@ describe('Health (integration)', () => {
     expect(res.headers['x-request-id']).toBeDefined();
   });
 
+  it('GET /api/v1 describes the API', async () => {
+    const res = await ctx.http().get('/api/v1').expect(200);
+    expect(res.body).toMatchObject({
+      name: 'persian-ecommerce-api',
+      status: 'ok',
+      health: '/health',
+    });
+  });
+
   it('GET /health/ready checks the database', async () => {
     const res = await ctx.http().get('/health/ready').expect(200);
     expect(res.body.checks.database.status).toBe('up');
