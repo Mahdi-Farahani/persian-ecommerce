@@ -14,7 +14,7 @@
     "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "test:integration": "pnpm --filter @pe/api test:integration",
-    "test:e2e": "pnpm --filter @pe/e2e test",
+    "test:e2e": "pnpm --filter @pe/e2e e2e",
     "build": "pnpm -r build",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,yml,yaml,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,yml,yaml,css}\"",
