@@ -8,10 +8,10 @@ import {
 } from '@pe/shared';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { AdminOrderItems, SellerName } from '@/components/admin/orders/admin-order-items';
 import { OrderStatusForm } from '@/components/admin/orders/order-status-form';
 import { ShipmentForm } from '@/components/admin/orders/shipment-form';
 import { PageHeader } from '@/components/admin/page-header';
-import { OrderItemsList } from '@/components/orders/order-items-list';
 import { OrderStatusBadge, PaymentStatusBadge } from '@/components/orders/order-status-badge';
 import { OrderTimeline } from '@/components/orders/order-timeline';
 import { OrderTotals } from '@/components/orders/order-totals';
@@ -36,6 +36,15 @@ export default async function AdminOrderDetailPage({
   if (!order) notFound();
   const canManage = hasPermission(user, AdminPermissions.ordersManage);
   const canViewPayments = hasPermission(user, AdminPermissions.paymentView);
+  const canViewSellers = hasPermission(user, AdminPermissions.sellersView);
+  // Shipments only carry the seller id; resolve names from the order lines.
+  const sellersById = new Map(
+    order.items.flatMap((item) => (item.seller ? [[item.seller.id, item.seller] as const] : [])),
+  );
+  const shipmentSeller = (sellerId: string | null) => {
+    if (!sellerId) return null;
+    return sellersById.get(sellerId) ?? { id: sellerId, storeName: copy.unknownSeller, slug: '' };
+  };
 
   const facts: Array<{ label: string; value: string; ltr?: boolean }> = [
     { label: copy.customer, value: order.customer.name || copy.noName },
@@ -66,7 +75,7 @@ export default async function AdminOrderDetailPage({
         <div className="flex flex-col gap-6">
           <Card>
             <CardTitle>{copy.items}</CardTitle>
-            <OrderItemsList items={order.items} />
+            <AdminOrderItems items={order.items} canViewSellers={canViewSellers} />
           </Card>
 
           <Card>
@@ -121,6 +130,13 @@ export default async function AdminOrderDetailPage({
               <ul className="mb-4 flex flex-col gap-3 text-sm">
                 {order.shipments.map((shipment) => (
                   <li key={shipment.id} className="rounded-lg border border-border p-3">
+                    <p>
+                      <span className="text-ink-muted">{copy.shipmentSeller}: </span>
+                      <SellerName
+                        seller={shipmentSeller(shipment.sellerId)}
+                        canViewSellers={canViewSellers}
+                      />
+                    </p>
                     <p>
                       <span className="text-ink-muted">{copy.carrier}: </span>
                       {shipment.carrier ?? adminFa.common.none}

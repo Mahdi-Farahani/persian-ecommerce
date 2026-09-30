@@ -5,6 +5,8 @@ import type {
   AdminPaymentDetail,
   AdminPaymentSummary,
   AdminReviewView,
+  AdminSellerView,
+  AdminSettlementView,
   AttributeSummary,
   AuditLogView,
   BrandDetail,
@@ -18,6 +20,7 @@ import type {
   PaymentGatewayAdminView,
   ProductCard,
   ProductDetail,
+  SellerOfferView,
 } from '@pe/shared';
 import type { QueryValue } from '@/lib/api/client';
 import { ApiError } from '@/lib/api/errors';
@@ -163,6 +166,49 @@ export async function adminGetCoupon(id: string): Promise<AdminCoupon | null> {
 
 export function adminListShippingMethods() {
   return serverApi<AdminShippingMethod[]>('/admin/shipping-methods', noStore);
+}
+
+export function adminListSellers(query: Record<string, QueryValue>) {
+  return serverApi<Paginated<AdminSellerView>>('/admin/sellers', { query, ...noStore });
+}
+
+export async function adminGetSeller(id: string): Promise<AdminSellerView | null> {
+  try {
+    return await serverApi<AdminSellerView>(`/admin/sellers/${encodeURIComponent(id)}`, noStore);
+  } catch (error) {
+    if (error instanceof ApiError && error.isNotFound) return null;
+    throw error;
+  }
+}
+
+export function adminListSellerOffers(sellerId: string, query: Record<string, QueryValue>) {
+  return serverApi<Paginated<SellerOfferView>>(
+    `/admin/sellers/${encodeURIComponent(sellerId)}/products`,
+    { query, ...noStore },
+  );
+}
+
+export function adminListSellerOrders(sellerId: string, query: Record<string, QueryValue>) {
+  return serverApi<Paginated<AdminOrderSummary>>(
+    `/admin/sellers/${encodeURIComponent(sellerId)}/orders`,
+    { query, ...noStore },
+  );
+}
+
+export function adminListSettlements(query: Record<string, QueryValue>) {
+  return serverApi<Paginated<AdminSettlementView>>('/admin/settlements', { query, ...noStore });
+}
+
+export async function adminGetSettlement(id: string): Promise<AdminSettlementView | null> {
+  try {
+    return await serverApi<AdminSettlementView>(
+      `/admin/settlements/${encodeURIComponent(id)}`,
+      noStore,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.isNotFound) return null;
+    throw error;
+  }
 }
 
 /** Resolves to null instead of throwing when the caller lacks permission. */

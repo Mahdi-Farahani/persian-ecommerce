@@ -21,6 +21,8 @@ export const AdminPermissions = {
   settingsManage: 'settings.manage',
   reportsView: 'reports.view',
   auditLogsView: 'audit_logs.view',
+  sellersView: 'sellers.view',
+  sellersManage: 'sellers.manage',
 } as const;
 
 /** Permissions that grant access to the admin shell at all. */
@@ -36,6 +38,7 @@ const ENTRY_PERMISSIONS = [
   AdminPermissions.settingsManage,
   AdminPermissions.reportsView,
   AdminPermissions.auditLogsView,
+  AdminPermissions.sellersView,
 ] as const;
 
 export interface AdminNavItem {
@@ -93,6 +96,16 @@ export const adminNavItems: readonly AdminNavItem[] = [
     href: '/admin/reviews',
     label: adminFa.nav.reviews,
     permissions: [AdminPermissions.reviewsModerate],
+  },
+  {
+    href: '/admin/sellers',
+    label: adminFa.nav.sellers,
+    permissions: [AdminPermissions.sellersView],
+  },
+  {
+    href: '/admin/settlements',
+    label: adminFa.nav.settlements,
+    permissions: [AdminPermissions.sellersView],
   },
   { href: '/admin/users', label: adminFa.nav.users, permissions: [AdminPermissions.usersView] },
   {

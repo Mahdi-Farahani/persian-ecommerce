@@ -75,6 +75,21 @@ function QuickLinks({ user }: { user: AuthUser }) {
       show: can(AdminPermissions.reviewsModerate),
     },
     {
+      href: '/admin/sellers?status=PENDING',
+      label: copy.pendingSellers,
+      show: can(AdminPermissions.sellersView),
+    },
+    {
+      href: '/admin/sellers',
+      label: copy.manageSellers,
+      show: can(AdminPermissions.sellersView),
+    },
+    {
+      href: '/admin/settlements?status=PENDING',
+      label: copy.manageSettlements,
+      show: can(AdminPermissions.sellersView),
+    },
+    {
       href: '/admin/audit-logs',
       label: copy.viewAuditLogs,
       show: can(AdminPermissions.auditLogsView),

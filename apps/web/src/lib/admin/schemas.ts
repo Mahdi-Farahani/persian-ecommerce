@@ -4,9 +4,11 @@ import {
   SLUG_REGEX,
   VariantStatuses,
   toEnglishDigits,
+  toPersianDigits,
 } from '@pe/shared';
 import * as yup from 'yup';
 import { adminFa } from '@/i18n/admin-fa';
+import { hasAtMostTwoDecimals, MAX_COMMISSION_PERCENT, parseDecimalInput } from './sellers';
 import { CouponTypes } from './types';
 
 const v = adminFa.validation;
@@ -318,3 +320,37 @@ export const shippingMethodSchema = yup.object({
   sortOrder: sortOrder().max(SORT_ORDER_MAX, v.maxValue(SORT_ORDER_MAX)),
 });
 export type ShippingMethodFormValues = yup.InferType<typeof shippingMethodSchema>;
+
+// ---------------------------------------------------------------------------
+// Sellers & settlements
+// ---------------------------------------------------------------------------
+
+const SELLER_REASON_MAX = 500;
+const PAYMENT_REFERENCE_MAX = 100;
+
+/** Commission editor; the percent is converted to basis points by the caller. */
+export const commissionSchema = yup.object({
+  percent: yup
+    .number()
+    .transform((_value: unknown, original: unknown) => parseDecimalInput(original))
+    .typeError(v.number)
+    .min(0, v.commissionRange(toPersianDigits(MAX_COMMISSION_PERCENT)))
+    .max(MAX_COMMISSION_PERCENT, v.commissionRange(toPersianDigits(MAX_COMMISSION_PERCENT)))
+    .test('scale', v.twoDecimals, (value) => value === undefined || hasAtMostTwoDecimals(value))
+    .required(v.required),
+});
+export type CommissionFormValues = yup.InferType<typeof commissionSchema>;
+
+export const sellerRejectSchema = yup.object({
+  reason: optionalText(SELLER_REASON_MAX),
+});
+export type SellerRejectFormValues = yup.InferType<typeof sellerRejectSchema>;
+
+/** Marks a settlement as paid; the bank reference is mandatory for bookkeeping. */
+export const settlementPaymentSchema = yup.object({
+  paymentReference: trimmed()
+    .required(v.required)
+    .max(PAYMENT_REFERENCE_MAX, v.maxLength(PAYMENT_REFERENCE_MAX)),
+  note: optionalText(SELLER_REASON_MAX),
+});
+export type SettlementPaymentFormValues = yup.InferType<typeof settlementPaymentSchema>;
