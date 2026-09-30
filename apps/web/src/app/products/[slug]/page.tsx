@@ -5,11 +5,19 @@ import { toPersianDigits } from '@pe/shared';
 import { ProductGrid } from '@/components/catalog/product-grid';
 import { ProductPurchasePanel } from '@/components/catalog/product-purchase-panel';
 import { Container } from '@/components/layout/container';
+import { ProductReviews } from '@/components/reviews/product-reviews';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { t } from '@/i18n';
 import { assetUrl } from '@/lib/assets';
 import { getProduct, listProducts } from '@/lib/catalog/api';
 import { env } from '@/lib/env';
+import { getProductReviewsPage, listProductReviews } from '@/lib/reviews/server';
+import { REVIEWS_PAGE_SIZE } from '@/lib/reviews/sorting';
+
+const EMPTY_REVIEWS = {
+  items: [],
+  pagination: { page: 1, limit: REVIEWS_PAGE_SIZE, total: 0, totalPages: 0 },
+};
 
 type Params = Promise<{ slug: string }>;
 
@@ -35,11 +43,11 @@ export default async function ProductPage({ params }: { params: Params }) {
   const { slug } = await params;
   const product = await getProduct(slug);
   if (!product) notFound();
-  const related = await listProducts({
-    category: product.category.slug,
-    limit: 4,
-    sort: 'popular',
-  });
+  const [related, reviewsPage, reviews] = await Promise.all([
+    listProducts({ category: product.category.slug, limit: 4, sort: 'popular' }),
+    getProductReviewsPage(product.id),
+    listProductReviews(product.id),
+  ]);
   const relatedItems = related.items.filter((p) => p.id !== product.id).slice(0, 4);
   const crumbs = product.breadcrumb.map((c) => ({ label: c.name, href: `/categories/${c.slug}` }));
   const specGroups = groupSpecifications(product.specifications);
@@ -174,6 +182,15 @@ export default async function ProductPage({ params }: { params: Params }) {
             ))}
           </div>
         </section>
+      ) : null}
+
+      {reviewsPage ? (
+        <ProductReviews
+          productId={product.id}
+          productSlug={product.slug}
+          initialPage={reviewsPage}
+          initialReviews={reviews ?? EMPTY_REVIEWS}
+        />
       ) : null}
 
       {relatedItems.length > 0 ? (

@@ -16,6 +16,7 @@ export const AdminPermissions = {
   paymentGatewayView: 'payment_gateway.view',
   paymentGatewayUpdate: 'payment_gateway.update',
   paymentGatewayTest: 'payment_gateway.test',
+  reviewsModerate: 'reviews.moderate',
 } as const;
 
 /** Permissions that grant access to the admin shell at all. */
@@ -26,6 +27,7 @@ const ENTRY_PERMISSIONS = [
   AdminPermissions.ordersView,
   AdminPermissions.paymentView,
   AdminPermissions.paymentGatewayView,
+  AdminPermissions.reviewsModerate,
 ] as const;
 
 export interface AdminNavItem {
@@ -68,6 +70,11 @@ export const adminNavItems: readonly AdminNavItem[] = [
     href: '/admin/settings/payment-gateways',
     label: adminFa.nav.paymentGateways,
     permissions: [AdminPermissions.paymentGatewayView],
+  },
+  {
+    href: '/admin/reviews',
+    label: adminFa.nav.reviews,
+    permissions: [AdminPermissions.reviewsModerate],
   },
   { href: '/admin/users', label: adminFa.nav.users, permissions: [AdminPermissions.usersView] },
 ];

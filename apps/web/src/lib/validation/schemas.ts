@@ -5,6 +5,10 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_REGEX,
+  REVIEW_BODY_MAX,
+  REVIEW_MAX_RATING,
+  REVIEW_MIN_RATING,
+  REVIEW_TITLE_MAX,
   normalizeIranMobile,
   toEnglishDigits,
 } from '@pe/shared';
@@ -147,3 +151,33 @@ export const addressSchema = yup.object({
   isDefault: yup.boolean().default(false),
 });
 export type AddressFormValues = yup.InferType<typeof addressSchema>;
+
+export const REVIEW_TITLE_MIN = 3;
+export const REVIEW_BODY_MIN = 10;
+
+export const reviewSchema = yup.object({
+  rating: yup
+    .number()
+    // Radio groups report '' (or nothing) until a star is picked.
+    .transform((value: unknown, original: unknown) =>
+      original === '' || original === null || original === undefined ? undefined : value,
+    )
+    .typeError(v.rating)
+    .required(v.rating)
+    .integer(v.rating)
+    .min(REVIEW_MIN_RATING, v.rating)
+    .max(REVIEW_MAX_RATING, v.rating),
+  title: yup
+    .string()
+    .transform((s: string) => s.trim())
+    .required(v.required)
+    .min(REVIEW_TITLE_MIN, v.minLength(REVIEW_TITLE_MIN))
+    .max(REVIEW_TITLE_MAX, v.maxLength(REVIEW_TITLE_MAX)),
+  body: yup
+    .string()
+    .transform((s: string) => s.trim())
+    .required(v.required)
+    .min(REVIEW_BODY_MIN, v.minLength(REVIEW_BODY_MIN))
+    .max(REVIEW_BODY_MAX, v.maxLength(REVIEW_BODY_MAX)),
+});
+export type ReviewFormValues = yup.InferType<typeof reviewSchema>;

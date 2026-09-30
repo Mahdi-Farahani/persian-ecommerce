@@ -6,6 +6,7 @@ import { CartProvider } from '@/components/cart/cart-provider';
 import { ToastProvider } from '@/components/ui/toast';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { SiteHeader } from '@/components/layout/site-header';
+import { WishlistProvider } from '@/components/wishlist/wishlist-provider';
 import { t } from '@/i18n';
 import { getCurrentUser } from '@/lib/auth/server';
 import { getCart } from '@/lib/cart/server';
@@ -48,16 +49,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="flex min-h-full flex-col">
         <AuthProvider initialUser={user}>
           <CartProvider initialCart={cart}>
-            <ToastProvider>
-              <a href="#main-content" className="skip-link">
-                {t.nav.skipToContent}
-              </a>
-              <SiteHeader />
-              <main id="main-content" className="flex-1">
-                {children}
-              </main>
-              <SiteFooter />
-            </ToastProvider>
+            <WishlistProvider>
+              <ToastProvider>
+                <a href="#main-content" className="skip-link">
+                  {t.nav.skipToContent}
+                </a>
+                <SiteHeader />
+                <main id="main-content" className="flex-1">
+                  {children}
+                </main>
+                <SiteFooter />
+              </ToastProvider>
+            </WishlistProvider>
           </CartProvider>
         </AuthProvider>
       </body>

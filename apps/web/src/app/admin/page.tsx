@@ -9,6 +9,7 @@ import {
   adminListBrands,
   adminListCategories,
   adminListProducts,
+  adminListReviews,
   adminListUsers,
   optional,
 } from '@/lib/admin/server';
@@ -28,13 +29,15 @@ export default async function AdminDashboardPage() {
   const canManageCatalog = hasPermission(user, AdminPermissions.catalogManage);
   const canUsers = hasPermission(user, AdminPermissions.usersView);
   const canInventory = hasPermission(user, AdminPermissions.inventoryView);
+  const canReviews = hasPermission(user, AdminPermissions.reviewsModerate);
 
-  const [products, categories, brands, users, inventory] = await Promise.all([
+  const [products, categories, brands, users, inventory, pendingReviews] = await Promise.all([
     canCatalog ? optional(adminListProducts({ limit: 1 })) : null,
     canCatalog ? optional(adminListCategories()) : null,
     canCatalog ? optional(adminListBrands({ limit: 1, includeInactive: 'true' })) : null,
     canUsers ? optional(adminListUsers({ limit: 1 })) : null,
     canInventory ? optional(adminInventorySummary()) : null,
+    canReviews ? optional(adminListReviews({ limit: 1, status: 'PENDING' })) : null,
   ]);
 
   const stats: Stat[] = [
@@ -66,6 +69,13 @@ export default async function AdminDashboardPage() {
       href: '/admin/inventory?lowStock=true',
     });
   }
+  if (canReviews) {
+    stats.push({
+      label: adminFa.dashboard.pendingReviews,
+      value: pendingReviews?.pagination.total ?? null,
+      href: '/admin/reviews?status=PENDING',
+    });
+  }
 
   const quickLinks: Array<{ href: string; label: string; show: boolean }> = [
     { href: '/admin/products/new', label: adminFa.dashboard.newProduct, show: canManageCatalog },
@@ -89,6 +99,11 @@ export default async function AdminDashboardPage() {
       href: '/admin/settings/payment-gateways',
       label: adminFa.dashboard.managePaymentGateways,
       show: hasPermission(user, AdminPermissions.paymentGatewayView),
+    },
+    {
+      href: '/admin/reviews?status=PENDING',
+      label: adminFa.dashboard.manageReviews,
+      show: canReviews,
     },
   ];
 

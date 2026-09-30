@@ -2,6 +2,7 @@ import type { ProductCard as ProductCardData } from '@pe/shared';
 import { toPersianDigits } from '@pe/shared';
 import Image from 'next/image';
 import Link from 'next/link';
+import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { t } from '@/i18n';
 import { assetUrl } from '@/lib/assets';
 import { Price } from './price';
@@ -10,7 +11,9 @@ export function ProductCard({ product }: { product: ProductCardData }) {
   const image = assetUrl(product.image?.url);
   const href = `/products/${product.slug}`;
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface transition hover:shadow-md">
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface transition hover:shadow-md">
+      {/* Rendered outside the anchor so toggling never navigates. */}
+      <WishlistButton productId={product.id} className="absolute end-2 top-2 z-10" />
       <Link href={href} className="relative block aspect-square overflow-hidden bg-surface-muted">
         {image ? (
           <Image

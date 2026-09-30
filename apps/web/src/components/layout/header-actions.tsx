@@ -9,18 +9,34 @@ import { browserApi } from '@/lib/api/client';
 import { canAccessAdmin } from '@/lib/admin/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { selectItemCount, useCartStore } from '@/store/cart-store';
+import { selectWishlistCount, useWishlistStore } from '@/store/wishlist-store';
 
 /**
- * Account and cart entry points. Renders the login link for guests and a
- * dropdown menu for signed-in users.
+ * Account, wishlist and cart entry points. Renders the login link for guests
+ * and a dropdown menu (plus the wishlist shortcut) for signed-in users.
  */
 export function HeaderActions() {
   const user = useAuthStore((state) => state.user);
   const itemCount = useCartStore(selectItemCount);
+  const wishlistCount = useWishlistStore(selectWishlistCount);
   return (
     <div className="ms-auto flex items-center gap-2 sm:gap-3">
       {user ? (
-        <UserMenu />
+        <>
+          <UserMenu />
+          <Link
+            href="/account/wishlist"
+            aria-label={t.nav.wishlist}
+            className="relative hidden size-10 place-items-center rounded-lg border border-border transition hover:border-brand-400 hover:text-brand-700 sm:grid"
+          >
+            <HeartIcon />
+            {wishlistCount > 0 ? (
+              <span className="absolute -end-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full bg-accent-500 px-1 text-[11px] font-bold text-white tabular-nums">
+                {toPersianDigits(wishlistCount)}
+              </span>
+            ) : null}
+          </Link>
+        </>
       ) : (
         <Link
           href="/login"
@@ -88,6 +104,8 @@ function UserMenu() {
   const links: Array<{ href: string; label: string }> = [
     { href: '/account', label: t.account.profile },
     { href: '/account/orders', label: t.account.orders },
+    { href: '/account/wishlist', label: t.account.wishlist },
+    { href: '/account/reviews', label: t.account.reviews },
     { href: '/account/addresses', label: t.account.addresses },
     { href: '/account/security', label: t.account.security },
   ];
@@ -158,6 +176,24 @@ function UserIcon() {
     >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-3.5 3.6-6 8-6s8 2.5 8 6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function HeartIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.5 4.5 7 4.5c2 0 3.4 1.1 5 3 1.6-1.9 3-3 5-3 3.5 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

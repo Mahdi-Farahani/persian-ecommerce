@@ -32,7 +32,12 @@ export interface AuditLogView {
 
 export interface DashboardMetrics {
   generatedAt: string;
-  sales: { today: SalesWindow; last7Days: SalesWindow; last30Days: SalesWindow; allTime: SalesWindow };
+  sales: {
+    today: SalesWindow;
+    last7Days: SalesWindow;
+    last30Days: SalesWindow;
+    allTime: SalesWindow;
+  };
   dailySales: DailySalesPoint[];
   orders: {
     pendingPayment: number;

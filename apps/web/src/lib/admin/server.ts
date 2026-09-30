@@ -4,6 +4,7 @@ import type {
   AdminOrderSummary,
   AdminPaymentDetail,
   AdminPaymentSummary,
+  AdminReviewView,
   AttributeSummary,
   BrandDetail,
   CategoryNode,
@@ -114,6 +115,19 @@ export function adminInventoryTransactions(variantId: string) {
     `/admin/inventory/${encodeURIComponent(variantId)}/transactions`,
     noStore,
   );
+}
+
+export function adminListReviews(query: Record<string, QueryValue>) {
+  return serverApi<Paginated<AdminReviewView>>('/admin/reviews', { query, ...noStore });
+}
+
+export async function adminGetReview(id: string): Promise<AdminReviewView | null> {
+  try {
+    return await serverApi<AdminReviewView>(`/admin/reviews/${encodeURIComponent(id)}`, noStore);
+  } catch (error) {
+    if (error instanceof ApiError && error.isNotFound) return null;
+    throw error;
+  }
 }
 
 export function adminListPaymentGateways() {
