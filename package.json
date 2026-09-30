@@ -1,0 +1,29 @@
+{
+  "name": "persian-ecommerce",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Persian RTL e-commerce marketplace platform (Next.js + NestJS + MariaDB)",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "lint": "pnpm -r --workspace-concurrency=1 lint",
+    "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
+    "test": "pnpm -r --workspace-concurrency=1 test",
+    "test:integration": "pnpm --filter @pe/api test:integration",
+    "test:e2e": "pnpm --filter @pe/e2e test",
+    "build": "pnpm -r build",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,yml,yaml,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,yml,yaml,css}\"",
+    "db:migrate": "pnpm --filter @pe/api prisma:migrate:deploy",
+    "db:seed": "pnpm --filter @pe/api prisma:seed",
+    "dev:api": "pnpm --filter @pe/api start:dev",
+    "dev:web": "pnpm --filter @pe/web dev"
+  },
+  "devDependencies": {
+    "prettier": "3.9.9"
+  }
+}

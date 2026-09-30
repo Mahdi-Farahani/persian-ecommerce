@@ -179,3 +179,31 @@ When fixing a bug:
 # 10. Completion Standard
 
 A phase is complete only when all applicable checks pass.
+
+---
+
+# 11. Actual Commands (as built)
+
+Run from the repository root:
+
+```bash
+pnpm lint                     # ESLint in every workspace
+pnpm typecheck                # tsc --noEmit in every workspace
+pnpm test                     # vitest unit tests (api, shared) + component tests (web)
+pnpm test:integration         # api integration tests (needs MariaDB; uses <db>_test)
+pnpm build                    # production builds (shared, api, web)
+pnpm format:check             # prettier
+docker compose build && docker compose up -d
+```
+
+Layout:
+
+* `apps/api/src/**/*.spec.ts` — unit tests (mocked Prisma, no database).
+* `apps/api/test/**/*.integration-spec.ts` — boot the real Nest app via
+  `createTestApp()` against MariaDB; migrations + seed run in global setup.
+* `apps/web/src/**/*.test.tsx` — React Testing Library component tests (jsdom).
+* `packages/shared/src/**/*.test.ts` — pure unit tests.
+
+The Nest integration harness (`test/utils/test-app.ts`) applies the same
+`configureApp()` used in production so filters, pipes and headers are tested
+as deployed.

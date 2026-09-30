@@ -327,3 +327,21 @@ Provide development seed data for:
 * sample inventory
 
 Seed scripts must be deterministic and safe to rerun where possible.
+
+---
+
+# 16. Implementation Notes (as built)
+
+* Primary keys are UUID v7 strings (`CHAR(36)`): time-ordered for index
+  locality and unguessable in public URLs.
+* Table names are snake_case plural (`@@map`), columns camelCase.
+* Monetary columns are `BIGINT` integers in IRR (see ARCHITECTURE.md §21).
+* Character set `utf8mb4` / collation `utf8mb4_unicode_ci` for full Persian
+  support.
+* Migrations live in `apps/api/prisma/migrations` and are applied with
+  `prisma migrate deploy` by the API container entrypoint on start.
+* Seed: `apps/api/src/database/seed` (roles, permissions, bootstrap admin).
+  The admin password comes from `SEED_ADMIN_PASSWORD`; when absent a random
+  password is generated and printed once.
+* Integration tests use a separate `<database>_test` schema created and
+  migrated automatically by the vitest global setup.

@@ -423,3 +423,72 @@ Distributed
 Complex
 Difficult to operate
 ```
+
+---
+
+# 21. Implementation Decisions (as built)
+
+This section records how the architecture above is realised in the repository.
+It is updated whenever an implementation decision changes.
+
+## Monorepo
+
+```text
+apps/api          NestJS 12 (ESM, TypeScript 6 strict), Prisma 7, vitest
+apps/web          Next.js 16 App Router, React 19, Tailwind CSS 4, vitest + Testing Library
+packages/shared   Pure TypeScript helpers shared by both apps (money, Persian formatting, API contracts)
+infra/nginx       Reverse proxy (HTTP config + TLS example)
+infra/docker      Optional extra CA certificates for image builds behind TLS-inspecting proxies
+```
+
+Package manager: pnpm workspaces (`pnpm-workspace.yaml`). All versions are pinned exactly.
+
+## Toolchain versions
+
+* Node.js 22 LTS (`node:22-alpine` images); Node 24 LTS is supported for local development.
+* TypeScript 6.0 — TypeScript 7 (native compiler) is not yet supported by
+  `typescript-eslint`, `@nestjs/swagger` or `ts-jest`, so 6.x is the newest
+  version the toolchain accepts.
+* ESLint 10 for `api`/`shared`; ESLint 9 for `web` because
+  `eslint-config-next` peers still require it.
+
+## Backend conventions
+
+* ESM output (`"type": "module"`, NodeNext resolution, `.js` import suffixes).
+* `configureApp()` in `apps/api/src/app.setup.ts` wires helmet, CORS, cookies,
+  validation pipe (`whitelist` + `forbidNonWhitelisted`), the global exception
+  filter, request-id middleware and Swagger. Integration tests call the same
+  function, so tests exercise production wiring.
+* Errors always use `{ success: false, error: { code, message, details? } }`.
+  Domain errors extend `AppException` with a stable `code`.
+* Global prefix `/api/v1`; `/health` and `/health/ready` are exempt.
+* Logging: Nest `ConsoleLogger` with JSON output in production, one access-log
+  line per request including `requestId`, `durationMs` and status.
+* Rate limiting: `@nestjs/throttler` globally (300 req/min per IP) plus stricter
+  nginx zones for `/api/v1/auth/*`.
+
+## Database access
+
+* Prisma 7 with `@prisma/adapter-mariadb` (driver adapter; no Rust query engine).
+  `prisma.config.ts` holds CLI configuration; migrations use the WASM schema
+  engine so the production image needs no platform-specific engine binary.
+* The generated client lives in `apps/api/src/generated/prisma` (git-ignored,
+  generated during build).
+* Seed code is compiled with the application (`src/database/seed`) so it can
+  run inside the production image (`node dist/database/seed.js`).
+
+## Frontend conventions
+
+* Persian-first: `<html lang="fa" dir="rtl">`, self-hosted Vazirmatn variable
+  font (OFL), logical CSS properties (`ps-`, `pe-`, `start`, `end`).
+* All copy comes from the message catalogue in `apps/web/src/i18n`; components
+  never hard-code Persian text.
+* API access: `browserApi` (Client Components, same-origin `/api/v1` through
+  nginx) and `serverApi`/`publicApi` (Server Components, internal Docker URL,
+  cookies forwarded).
+* Only `NEXT_PUBLIC_*` variables reach the browser bundle.
+
+## Money
+
+Amounts are integers in Iranian Rial (IRR), stored as `BIGINT`. The UI converts
+to Toman (÷10) purely for display. See `packages/shared/src/money.ts`.

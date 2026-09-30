@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: var(--font-vazirmatn), 'Vazirmatn', 'Segoe UI', Tahoma, sans-serif;
+
+  --color-brand-50: #eef6ff;
+  --color-brand-100: #d9eaff;
+  --color-brand-200: #bcdaff;
+  --color-brand-300: #8ec2ff;
+  --color-brand-400: #599fff;
+  --color-brand-500: #327bff;
+  --color-brand-600: #1b5cf5;
+  --color-brand-700: #1447e1;
+  --color-brand-800: #173bb6;
+  --color-brand-900: #19368f;
+
+  --color-accent-500: #ef4444;
+  --color-accent-600: #dc2626;
+
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f6f8;
+  --color-border: #e4e6ea;
+  --color-ink: #1f2430;
+  --color-ink-muted: #6b7280;
+
+  --radius-card: 0.75rem;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  direction: rtl;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-surface-muted);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: 'ss01';
+  min-height: 100dvh;
+}
+
+/* Persian typography: slightly relaxed line height reads better for Arabic script. */
+p,
+li,
+td,
+th {
+  line-height: 1.9;
+}
+
+/* Keep numbers in tabular alignment inside tables and prices. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible focus ring for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+/* Skip link: hidden until focused. */
+.skip-link {
+  position: absolute;
+  inset-inline-start: 0.5rem;
+  top: -100%;
+  z-index: 100;
+  background: var(--color-brand-600);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: top 0.15s ease-in-out;
+}
+
+.skip-link:focus {
+  top: 0.5rem;
+}

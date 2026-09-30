@@ -239,3 +239,38 @@ MariaDB cluster / managed DB
 ```
 
 But do not implement this complexity during the initial single-server deployment unless required.
+
+---
+
+# 14. Compose Stack (as built)
+
+`docker-compose.yml` defines four services on two internal networks:
+
+| Service   | Image                     | Notes                                                        |
+| --------- | ------------------------- | ------------------------------------------------------------ |
+| `mariadb` | `mariadb:11`              | `backend` network only, named volume `mariadb-data`, healthcheck |
+| `api`     | built from `apps/api`     | runs migrations (+ optional seed) on start, healthcheck `/health/ready` |
+| `web`     | built from `apps/web`     | Next.js standalone server, healthcheck `/healthz`            |
+| `nginx`   | `nginx:1.29-alpine`       | the only service publishing ports (`NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT`) |
+
+Required `.env` keys: `MARIADB_ROOT_PASSWORD`, `MARIADB_PASSWORD`, `APP_URL`,
+`CORS_ORIGINS`, `SEED_ADMIN_PASSWORD` (first start). See `.env.example`.
+
+Runtime switches on the API container:
+
+* `RUN_MIGRATIONS_ON_START` (default `true`) — apply pending migrations.
+* `SEED_ON_START` (default `true`) — idempotent seed of roles/permissions/admin.
+* `SWAGGER_ENABLED` (default `false` in production).
+
+## TLS
+
+Copy `infra/nginx/conf.d/tls.conf.example` over `default.conf`, place
+`fullchain.pem`/`privkey.pem` in `infra/nginx/certs/` (git-ignored) and
+`docker compose restart nginx`. HTTP requests are redirected to HTTPS and HSTS
+is enabled.
+
+## Builds behind a TLS-inspecting proxy
+
+Drop the proxy CA (`*.crt`) into `infra/docker/certs/` before
+`docker compose build`; the Dockerfiles trust it for package downloads. The
+directory is git-ignored.
