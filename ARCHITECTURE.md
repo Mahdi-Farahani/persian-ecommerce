@@ -423,3 +423,151 @@ Distributed
 Complex
 Difficult to operate
 ```
+
+---
+
+# 21. Implementation Decisions (as built)
+
+This section records how the architecture above is realised in the repository.
+It is updated whenever an implementation decision changes.
+
+## Monorepo
+
+```text
+apps/api          NestJS 12 (ESM, TypeScript 6 strict), Prisma 7, vitest
+apps/web          Next.js 16 App Router, React 19, Tailwind CSS 4, vitest + Testing Library
+packages/shared   Pure TypeScript helpers shared by both apps (money, Persian formatting, API contracts)
+infra/nginx       Reverse proxy (HTTP config + TLS example)
+infra/docker      Optional extra CA certificates for image builds behind TLS-inspecting proxies
+```
+
+Package manager: pnpm workspaces (`pnpm-workspace.yaml`). All versions are pinned exactly.
+
+## Toolchain versions
+
+* Node.js 22 LTS (`node:22-alpine` images); Node 24 LTS is supported for local development.
+* TypeScript 6.0 — TypeScript 7 (native compiler) is not yet supported by
+  `typescript-eslint`, `@nestjs/swagger` or `ts-jest`, so 6.x is the newest
+  version the toolchain accepts.
+* ESLint 10 for `api`/`shared`; ESLint 9 for `web` because
+  `eslint-config-next` peers still require it.
+
+## Backend conventions
+
+* ESM output (`"type": "module"`, NodeNext resolution, `.js` import suffixes).
+* `configureApp()` in `apps/api/src/app.setup.ts` wires helmet, CORS, cookies,
+  validation pipe (`whitelist` + `forbidNonWhitelisted`), the global exception
+  filter, request-id middleware and Swagger. Integration tests call the same
+  function, so tests exercise production wiring.
+* Errors always use `{ success: false, error: { code, message, details? } }`.
+  Domain errors extend `AppException` with a stable `code`.
+* Global prefix `/api/v1`; `/health` and `/health/ready` are exempt.
+* Logging: Nest `ConsoleLogger` with JSON output in production, one access-log
+  line per request including `requestId`, `durationMs` and status.
+* Rate limiting: `@nestjs/throttler` globally (300 req/min per IP) plus stricter
+  nginx zones for `/api/v1/auth/*`.
+
+## Database access
+
+* Prisma 7 with `@prisma/adapter-mariadb` (driver adapter; no Rust query engine).
+  `prisma.config.ts` holds CLI configuration; migrations use the WASM schema
+  engine so the production image needs no platform-specific engine binary.
+* The generated client lives in `apps/api/src/generated/prisma` (git-ignored,
+  generated during build).
+* Seed code is compiled with the application (`src/database/seed`) so it can
+  run inside the production image (`node dist/database/seed.js`).
+
+## Frontend conventions
+
+* Persian-first: `<html lang="fa" dir="rtl">`, self-hosted Vazirmatn variable
+  font (OFL), logical CSS properties (`ps-`, `pe-`, `start`, `end`).
+* All copy comes from the message catalogue in `apps/web/src/i18n`; components
+  never hard-code Persian text.
+* API access: `browserApi` (Client Components, same-origin `/api/v1` through
+  nginx) and `serverApi`/`publicApi` (Server Components, internal Docker URL,
+  cookies forwarded).
+* Only `NEXT_PUBLIC_*` variables reach the browser bundle.
+
+## Money
+
+Amounts are integers in Iranian Rial (IRR), stored as `BIGINT`. The UI converts
+to Toman (÷10) purely for display. See `packages/shared/src/money.ts`.
+
+## Authentication (as built)
+
+* Passwords: Argon2id (19 MiB, t=2). Login by email or Iranian mobile number.
+* Access token: HS256 JWT, 15 min (`JWT_ACCESS_TTL_SECONDS`), payload
+  `{ sub, sid (session family), type }`. Verified on every request together
+  with a live-session check, so logout/suspension take effect immediately.
+* Refresh token: opaque 48-byte random value, stored SHA-256 hashed in
+  `refresh_sessions`, rotated on every use. Rotated tokens are tolerated for
+  30 s (parallel requests); later reuse revokes the whole family.
+* Cookies: `pe_access` and `pe_refresh` are httpOnly, SameSite=Lax, Secure in
+  production. Tokens are also returned in the login body for non-browser clients.
+* CSRF: cookie-authenticated non-GET requests must carry `X-Requested-With`
+  (custom headers require a CORS preflight, which is restricted to
+  `CORS_ORIGINS`) or an allowed `Origin`.
+* Brute force: `LOGIN_MAX_FAILED_ATTEMPTS` failures lock the account for
+  `LOGIN_LOCK_MINUTES`; auth endpoints have stricter throttling.
+* Authorization: global `JwtAuthGuard` (routes protected by default,
+  `@Public()` / `@OptionalAuth()` opt out) + `PermissionsGuard`
+  (`@RequirePermissions()`, `@Roles()`); SUPER_ADMIN bypasses permission checks.
+* Web: `src/proxy.ts` refreshes an expired access cookie before rendering and
+  redirects anonymous visitors away from `/account`, `/checkout`, `/admin`,
+  `/seller`. The browser API client retries once after a transparent refresh.
+* Notifications: `NotificationProvider` abstraction (email/SMS); the logging
+  provider is used until a real transport is configured.
+
+## File storage (as built)
+
+`StorageProvider` (`apps/api/src/storage`) abstracts object storage; the
+`LocalStorageProvider` writes under `UPLOADS_DIR` (a Docker volume) and the
+API serves the files at `/uploads/*` with long cache headers. Uploads are
+decoded with sharp, re-encoded as WebP (max 1600px, metadata stripped) and
+stored under random names, so client-supplied MIME types and file names are
+never trusted. An S3-compatible provider can replace the local one through
+the `STORAGE_PROVIDER` factory without touching business modules.
+
+The web app references uploads by relative path (`/uploads/...`); nginx
+proxies that prefix to the API and `next.config.ts` rewrites it to the API
+origin so the Next.js image optimizer can fetch same-origin sources.
+
+## Orders & payments (as built)
+
+Checkout is two steps owned by the backend: `POST /checkout` turns the
+server-recomputed quote into an order (one transaction: reserve stock,
+snapshot items, convert the cart, count the coupon) and `POST /payments`
+starts a payment attempt through the provider abstraction in
+`apps/api/src/payments` (see `docs/payments/PAYMENT-ARCHITECTURE.md`).
+
+* `OrdersService` owns the order state machine (`order-status.ts`) and calls
+  `InventoryService` for the side effects (commit / release / restock).
+  `OrdersScheduler` cancels unpaid orders after `ORDER_PAYMENT_TIMEOUT_MINUTES`.
+* `PaymentsService` orchestrates create → callback → verify → finalize →
+  settle/refund/reconcile and is the only caller of `PaymentProvider`
+  adapters, which are built by `PaymentProviderFactory` from the encrypted
+  DB registry (`ProviderRegistryService`). Verification is claimed with a
+  conditional update so duplicate callbacks never double-finalize; the
+  browser redirect is never trusted as proof of payment.
+* Adapters: ZarinPal (verified against official SDK sources), SnappPay,
+  DigiPay, TorobPay (configurable, gated until contract documentation is
+  confirmed) and Mock (dev/test). Each adapter must pass the shared provider
+  contract test suite.
+* The storefront selects a provider from `GET /payments/providers`, redirects
+  to the gateway and renders `/payment/{success,failure,pending}` from the
+  backend status; the admin panel manages gateways, orders and payments with
+  granular permissions and audit logs.
+
+## Marketplace (as built)
+
+Multi-seller support keeps a single shared catalogue: a seller's offer is a
+`ProductVariant` with a `sellerId`, so pricing, stock reservation, cart,
+checkout and payments are unchanged. `OrdersService.placeOrder` snapshots
+the seller and the commission split per line; `registerShipment` advances an
+order only when every seller group (platform included) has dispatched.
+Sellers reach the platform through `/seller/*` (`SellersModule`), which
+resolves the caller's approved seller record on every request and scopes
+all queries by `sellerId`; the SELLER role is granted and revoked together
+with the approval status. Settlements are payout batches of delivered,
+unsettled items; real bank transfers happen outside the platform and are
+recorded by reference.

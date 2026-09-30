@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Native/postinstall build scripts that are explicitly allowed to run.
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - '@prisma/client'
+  - prisma
+  - argon2
+  - esbuild
+  - sharp
+  - unrs-resolver
+  - '@swc/core'
+  - '@tailwindcss/oxide'

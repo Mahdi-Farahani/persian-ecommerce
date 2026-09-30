@@ -327,3 +327,125 @@ Provide development seed data for:
 * sample inventory
 
 Seed scripts must be deterministic and safe to rerun where possible.
+
+---
+
+# 16. Implementation Notes (as built)
+
+* Primary keys are UUID v7 strings (`CHAR(36)`): time-ordered for index
+  locality and unguessable in public URLs.
+* Table names are snake_case plural (`@@map`), columns camelCase.
+* Monetary columns are `BIGINT` integers in IRR (see ARCHITECTURE.md §21).
+* Character set `utf8mb4` / collation `utf8mb4_unicode_ci` for full Persian
+  support.
+* Migrations live in `apps/api/prisma/migrations` and are applied with
+  `prisma migrate deploy` by the API container entrypoint on start.
+* Seed: `apps/api/src/database/seed` (roles, permissions, bootstrap admin).
+  The admin password comes from `SEED_ADMIN_PASSWORD`; when absent a random
+  password is generated and printed once.
+* Integration tests use a separate `<database>_test` schema created and
+  migrated automatically by the vitest global setup.
+
+## Catalog (as built)
+
+* `categories.path` is a materialised path of ancestor ids (`/id1/id2/`) with
+  `depth`; subtree queries use `path LIKE '<path><id>/%'`. Maximum depth 6.
+* Attributes are either informational (`product_attribute_values`) or
+  variant-defining (`attributes.isVariant`, `variant_attribute_values`).
+  `category_attributes` links attributes to categories; a category inherits
+  the attributes of its ancestors for filtering.
+* `products.minPrice` / `maxPrice` are denormalised from active variants and
+  recalculated on every variant change (used for price filters and sorting).
+* `inventory` has one row per variant (`stock`, `reserved`, threshold);
+  `inventory_transactions` is an append-only ledger (`stockAfter`,
+  `reservedAfter` snapshots). Stock mutations lock the row with
+  `SELECT … FOR UPDATE`.
+* Images are stored by the storage provider (local disk under `UPLOADS_DIR`,
+  served at `/uploads/*`); the database keeps only the URL.
+
+## Cart & checkout (as built)
+
+* `carts` belong to a user (`userId`) or to a guest session (`sessionHash`,
+  SHA-256 of the cookie token). Status `ACTIVE → MERGED | CONVERTED | ABANDONED`.
+* `cart_items` are unique per `(cartId, variantId)` and remember `priceAtAdd`
+  so price changes can be surfaced.
+* `coupons`: `PERCENTAGE` (0-100) or `FIXED` (IRR) with optional cap, minimum
+  cart amount, validity window and usage limits.
+* `shipping_methods`: flat `baseFee` with optional `freeAboveAmount`.
+
+## Orders & payments (as built)
+
+* `orders`: sequential `number` (rendered `PE-000042`), `status` enum
+  (`PENDING_PAYMENT → PAID → PROCESSING → PACKED → SHIPPED → DELIVERED`,
+  plus `CANCELLED`, `RETURN_REQUESTED`, `RETURNED`, `REFUNDED`; transitions
+  in `orders/order-status.ts`), integer IRR money (`subtotal`, `discount`,
+  `shippingFee`, `total`), snapshots of the address and shipping method,
+  `paymentDeadlineAt` (unpaid orders are cancelled after it). Indexes on
+  `(userId, createdAt)`, `(status, createdAt)`, `(status, paymentDeadlineAt)`.
+* `order_items`: immutable line snapshots (`variantId` nullable with
+  `SET NULL` so deleting a variant keeps history).
+* `order_status_history`: append-only audit trail of transitions.
+* `shipments` / `shipment_tracking`: carrier, tracking code, events.
+* `payments`: one row per attempt, unique `(orderId, attemptNumber)` and
+  unique `requestId` (idempotency key); `provider`, `environment`, `status`
+  (`INITIATED, REDIRECTED, CALLBACK_RECEIVED, VERIFYING, PAID, FAILED,
+  CANCELLED, EXPIRED, REFUNDED`), `providerAuthority`,
+  `providerTransactionId`, masked PAN, error code/message, redacted
+  callback/verification JSON, timestamps. Index `(provider, providerAuthority)`
+  serves callback lookup.
+* `payment_transactions`: immutable ledger of provider interactions
+  (`PAYMENT, REFUND, REVERSE, SETTLEMENT, INQUIRY`) with success flag,
+  provider reference and redacted payload.
+* `payment_provider_configs`: registry row per provider — `enabled`,
+  `isDefault` (one at most, enforced in code), `environment`,
+  `credentialsEncrypted` (AES-256-GCM), `configuration` JSON, last test result.
+* Inventory: placing an order reserves stock (`reservedQuantity`) inside the
+  same transaction; payment success commits the sale, cancellation/expiry
+  releases it, returns restock — all through the `inventory_transactions`
+  ledger.
+
+## Transaction isolation (as built)
+
+MariaDB 11 ships with `innodb_snapshot_isolation=ON`. Under the default
+REPEATABLE READ level a `SELECT … FOR UPDATE` issued after any earlier read in
+the same transaction fails with error 1020 ("Record has changed since last
+read") when another session changed the row in between — exactly what happens
+when two checkouts compete for the same stock. The Prisma adapter therefore
+starts every pooled session with
+`SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED`
+(`apps/api/src/prisma/prisma.service.ts`). Correctness of stock, order and
+payment updates does not depend on snapshot reads: every write path locks the
+rows it changes (`InventoryService.lock`, payment claim updates) inside one
+transaction. `test/inventory.integration-spec.ts` covers four concurrent
+checkouts contending for three units.
+
+## Reviews & wishlist (as built)
+
+* `reviews`: one row per `(productId, userId)` (unique), `rating` 1–5,
+  `title`, `body`, `status` (`PENDING → APPROVED | REJECTED`),
+  `isVerifiedPurchase` (author had a paid order containing the product when
+  submitting), moderation note/actor/time. Indexes on
+  `(productId, status, createdAt)`, `(status, createdAt)`, `(userId, createdAt)`.
+  `products.ratingAverage` / `ratingCount` are recomputed from `APPROVED`
+  rows on every status change, edit and delete.
+* `wishlist_items`: composite key `(userId, productId)`, cascade on user and
+  product deletion, capped at 200 per user in the service.
+
+## Marketplace (as built)
+
+* `sellers`: one per user (`userId` unique), `storeName`/`slug` unique,
+  `status` (`PENDING → APPROVED | REJECTED`, `APPROVED ↔ SUSPENDED`),
+  `commissionBps` (basis points), contact/legal/payout fields (IBAN masked in
+  API responses), moderation timestamps.
+* `product_variants.sellerId` (nullable, `SET NULL`): a variant with a seller
+  is that seller's offer; the platform's own stock has none. Index
+  `(sellerId, status)`.
+* `order_items.sellerId`, `commissionAmount`, `sellerAmount`,
+  `settlementId`: snapshot of the seller and the integer commission split
+  taken at order time (`floor(lineTotal × bps / 10000)`), so later commission
+  changes never rewrite history.
+* `shipments.sellerId`: which seller dispatched; platform shipments have
+  none. The order reaches `SHIPPED` once every seller group has a shipment.
+* `settlements`: payout batches per seller with gross/commission/net,
+  item count, period, status (`PENDING → PAID | CANCELLED`) and payment
+  reference; items reference their batch and are released on cancel.

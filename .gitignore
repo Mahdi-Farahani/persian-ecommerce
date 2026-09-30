@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# build output
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# generated
+apps/api/src/generated/
+coverage/
+playwright-report/
+test-results/
+
+# environment (secrets never committed)
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# TLS material and extra CA certificates must never be committed
+infra/nginx/certs/*
+!infra/nginx/certs/.gitkeep
+infra/docker/certs/*
+!infra/docker/certs/.gitkeep
+
+# uploads / runtime data
+apps/api/uploads/
+data/
