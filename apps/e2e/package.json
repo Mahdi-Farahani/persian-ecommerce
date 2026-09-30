@@ -1,0 +1,17 @@
+{
+  "name": "@pe/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser end-to-end tests against a running stack (Docker Compose through nginx by default)",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.4",
+    "typescript": "6.0.3"
+  }
+}

@@ -262,3 +262,24 @@ as deployed.
   ADMIN and SUPER_ADMIN callers, plus secret-free admin responses.
 * The integration global setup reseeds with `resetInventory: true` so paid
   orders from earlier runs never deplete the shared fixtures.
+
+### Browser end-to-end suite (`apps/e2e`)
+
+Playwright tests run against an already running stack (default
+`http://localhost:8080`, the Docker Compose stack through nginx; override
+with `E2E_BASE_URL`). They need the mock gateway at checkout
+(`PAYMENT_MOCK_ENABLED=true`, `PAYMENT_MOCK_DEFAULT=true`,
+`API_NODE_ENV=development` in `.env`) and the seeded admin password in
+`E2E_ADMIN_PASSWORD` (or `SEED_ADMIN_PASSWORD`).
+
+```bash
+docker compose up -d
+E2E_ADMIN_PASSWORD='…' pnpm test:e2e            # customer, admin and seller flows
+PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium pnpm test:e2e   # reuse a preinstalled browser
+```
+
+Flows: `customer-flow.spec.ts` (register → browse → search → product →
+cart → checkout → mock payment → order history → review),
+`admin-flow.spec.ts` (catalogue creation, publish, inventory, orders,
+dashboard, audit log) and `seller-flow.spec.ts` (application → approval →
+offer → order → fulfilment → settlement).
