@@ -430,3 +430,22 @@ checkouts contending for three units.
   rows on every status change, edit and delete.
 * `wishlist_items`: composite key `(userId, productId)`, cascade on user and
   product deletion, capped at 200 per user in the service.
+
+## Marketplace (as built)
+
+* `sellers`: one per user (`userId` unique), `storeName`/`slug` unique,
+  `status` (`PENDING → APPROVED | REJECTED`, `APPROVED ↔ SUSPENDED`),
+  `commissionBps` (basis points), contact/legal/payout fields (IBAN masked in
+  API responses), moderation timestamps.
+* `product_variants.sellerId` (nullable, `SET NULL`): a variant with a seller
+  is that seller's offer; the platform's own stock has none. Index
+  `(sellerId, status)`.
+* `order_items.sellerId`, `commissionAmount`, `sellerAmount`,
+  `settlementId`: snapshot of the seller and the integer commission split
+  taken at order time (`floor(lineTotal × bps / 10000)`), so later commission
+  changes never rewrite history.
+* `shipments.sellerId`: which seller dispatched; platform shipments have
+  none. The order reaches `SHIPPED` once every seller group has a shipment.
+* `settlements`: payout batches per seller with gross/commission/net,
+  item count, period, status (`PENDING → PAID | CANCELLED`) and payment
+  reference; items reference their batch and are released on cancel.

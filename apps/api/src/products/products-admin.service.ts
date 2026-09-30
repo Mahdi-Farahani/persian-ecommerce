@@ -32,6 +32,11 @@ import {
 
 type Tx = Prisma.TransactionClient;
 
+/** Marketplace context for mutations performed on behalf of a seller. */
+export interface MutationOptions {
+  sellerId?: string;
+}
+
 /**
  * Administrative catalogue writes. Every mutation keeps the denormalised
  * price range (`minPrice`/`maxPrice`) in sync and validates referential
@@ -91,7 +96,7 @@ export class ProductsAdminService {
     return toProductDetail(row, breadcrumb, { includeInactiveVariants: true });
   }
 
-  async create(dto: CreateProductDto): Promise<ProductDetail> {
+  async create(dto: CreateProductDto, options: MutationOptions = {}): Promise<ProductDetail> {
     await this.assertCategory(dto.categoryId);
     if (dto.brandId) await this.assertBrand(dto.brandId);
     await this.assertUniqueSkus(dto.variants.map((v) => v.sku));
@@ -114,7 +119,14 @@ export class ProductsAdminService {
       if (specifications) await this.replaceSpecifications(tx, product.id, specifications);
       const skuToId = new Map<string, string>();
       for (const [index, variant] of variants.entries()) {
-        const id = await this.insertVariant(tx, product.id, variant, index, variants.length === 1);
+        const id = await this.insertVariant(
+          tx,
+          product.id,
+          variant,
+          index,
+          variants.length === 1,
+          options.sellerId ?? null,
+        );
         skuToId.set(variant.sku, id);
       }
       if (images) {
@@ -189,14 +201,18 @@ export class ProductsAdminService {
 
   // --- variants ----------------------------------------------------------------
 
-  async addVariant(productId: string, dto: CreateVariantDto): Promise<ProductDetail> {
+  async addVariant(
+    productId: string,
+    dto: CreateVariantDto,
+    options: MutationOptions = {},
+  ): Promise<ProductDetail> {
     await this.requireProduct(productId);
     await this.assertUniqueSkus([dto.sku]);
     await this.prisma.$transaction(async (tx) => {
       const count = await tx.productVariant.count({ where: { productId } });
       if (dto.isDefault)
         await tx.productVariant.updateMany({ where: { productId }, data: { isDefault: false } });
-      await this.insertVariant(tx, productId, dto, count, count === 0);
+      await this.insertVariant(tx, productId, dto, count, count === 0, options.sellerId ?? null);
       await this.recalculatePriceRange(tx, productId);
     });
     return this.touched(productId);
@@ -373,6 +389,7 @@ export class ProductsAdminService {
     dto: CreateVariantDto,
     index: number,
     forceDefault: boolean,
+    sellerId: string | null = null,
   ): Promise<string> {
     this.assertPricing(dto.price, dto.compareAtPrice ?? null);
     if (dto.barcode) {
@@ -388,6 +405,7 @@ export class ProductsAdminService {
       data: {
         ...rest,
         productId,
+        sellerId,
         price: BigInt(dto.price),
         compareAtPrice:
           dto.compareAtPrice === undefined || dto.compareAtPrice === null

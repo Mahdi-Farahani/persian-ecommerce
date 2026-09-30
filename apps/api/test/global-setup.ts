@@ -56,5 +56,7 @@ export default async function globalSetup(): Promise<void> {
   await seedDatabase({
     databaseUrl,
     admin: { email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD },
+    // Paid orders consume fixture stock; start every run from the seed quantities.
+    resetInventory: true,
   });
 }

@@ -28,6 +28,7 @@ export const productDetailInclude = {
     orderBy: [{ sortOrder: 'asc' }, { price: 'asc' }],
     include: {
       inventory: true,
+      seller: { select: { id: true, storeName: true, slug: true } },
       attributeValues: { include: { attribute: true, value: true } },
       images: { select: { id: true } },
     },
@@ -122,6 +123,9 @@ export function toVariantDetail(variant: ProductDetailRow['variants'][number]): 
     inStock: variant.status === 'ACTIVE' && available > 0,
     lowStock: available > 0 && available <= threshold,
     imageIds: variant.images.map((i) => i.id),
+    seller: variant.seller
+      ? { id: variant.seller.id, storeName: variant.seller.storeName, slug: variant.seller.slug }
+      : null,
   };
 }
 

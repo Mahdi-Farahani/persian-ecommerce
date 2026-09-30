@@ -23,6 +23,8 @@ export interface CartItemView {
   inStock: boolean;
   /** True when the requested quantity exceeds availability. */
   quantityExceedsStock: boolean;
+  /** Marketplace seller of the variant; null for platform stock. */
+  seller: { id: string; storeName: string; slug: string } | null;
 }
 
 export type CartWarningCode =

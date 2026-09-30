@@ -444,3 +444,31 @@ See `docs/payments/` for the provider contract, security model and reconciliatio
 | GET | `/admin/dashboard` | `reports.view` | `DashboardMetrics`: sales windows (today / 7d / 30d / all time: paid orders, revenue, average order value), 14-day daily series, order counts by status, payment counts, customers, catalogue counts, inventory summary, pending reviews, 5 recent orders, 10 recent audit entries |
 | GET | `/admin/audit-logs` (`action` prefix, `entityType`, `entityId`, `actorId`, `from`, `to`, `page`, `limit`) | `audit_logs.view` | newest first; metadata is secret-redacted |
 | GET | `/admin/audit-logs/actions` | `audit_logs.view` | distinct action names for filters |
+
+## Marketplace (as built)
+
+Sellers sell through **offers**: product variants that carry their `sellerId`
+(platform stock has none). Cart, checkout, inventory and orders therefore work
+unchanged; order items snapshot the seller and the commission split.
+
+| Method | Path | Auth | Notes |
+| ------ | ---- | ---- | ----- |
+| POST | `/seller/apply` | user | one application per account; store name unique; IBAN masked in responses |
+| GET/PATCH | `/seller/profile` | user | own application/profile; editing a rejected one re-enters review |
+| GET | `/seller/dashboard` | `seller.portal` + APPROVED | sales 7/30 days, awaiting shipments, offers, settlement amounts |
+| GET | `/seller/products` (`search`, `lowStock`) | seller | my offers with stock |
+| POST | `/seller/products` | seller | propose a catalogue product (DRAFT until an admin publishes it) |
+| POST | `/seller/products/:productId/offers` | seller | `{ sku, price, compareAtPrice?, title?, attributeValues?, initialStock?, lowStockThreshold? }` |
+| PATCH/DELETE | `/seller/offers/:variantId` | seller | own offers only (404 otherwise) |
+| GET | `/seller/inventory`, `PATCH /seller/inventory/:variantId/adjust`, `GET …/transactions` | seller | own offers only |
+| GET | `/seller/orders` (`awaitingShipment`), `/seller/orders/:id` | seller | orders containing my items, projected to my items and my shipments |
+| POST | `/seller/orders/:id/shipments` | seller | dispatch my items; the order becomes `SHIPPED` once every seller (and the platform for its own items) has dispatched |
+| GET | `/seller/settlements` | seller | my settlement batches |
+| GET | `/sellers/:slug` | public | store identity |
+| GET | `/admin/sellers` (`status`, `search`), `/admin/sellers/:id` | `sellers.view` | includes owner, offer count, pending settlement amount |
+| PATCH | `/admin/sellers/:id/status` `{ status: APPROVED|SUSPENDED|REJECTED, reason? }` | `sellers.manage` | grants/revokes the SELLER role, deactivates offers on suspension; audited |
+| PATCH | `/admin/sellers/:id/commission` `{ commissionBps }` | `sellers.manage` | audited |
+| GET | `/admin/sellers/:id/products`, `/admin/sellers/:id/orders` | `sellers.view` | |
+| POST | `/admin/sellers/:id/settlements` | `sellers.manage` | batch of delivered, unsettled items (gross, commission, net) |
+| GET | `/admin/settlements` (`sellerId`, `status`), `/admin/settlements/:id` | `sellers.view` | |
+| PATCH | `/admin/settlements/:id` `{ status: PAID|CANCELLED, paymentReference?, note? }` | `sellers.manage` | cancelling releases the items; audited |

@@ -155,6 +155,8 @@ export interface VariantDetail {
   inStock: boolean;
   lowStock: boolean;
   imageIds: string[];
+  /** Marketplace seller offering this variant; null for the platform itself. */
+  seller: { id: string; storeName: string; slug: string } | null;
 }
 
 export interface ProductAttributeDisplay {

@@ -7,6 +7,10 @@ export interface OrdersConfig {
   paymentTimeoutMinutes: number;
 }
 
+export interface MarketplaceConfig {
+  defaultCommissionBps: number;
+}
+
 export interface PaymentsConfig {
   /** Absolute API base for provider callbacks, e.g. https://shop.example/api/v1 */
   publicApiUrl: string;
@@ -93,6 +97,12 @@ export class AppConfigService {
   get orders(): OrdersConfig {
     return {
       paymentTimeoutMinutes: this.config.get('ORDER_PAYMENT_TIMEOUT_MINUTES', { infer: true }),
+    };
+  }
+
+  get marketplace(): MarketplaceConfig {
+    return {
+      defaultCommissionBps: this.config.get('MARKETPLACE_DEFAULT_COMMISSION_BPS', { infer: true }),
     };
   }
 

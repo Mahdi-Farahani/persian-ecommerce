@@ -12,3 +12,4 @@ export * from './inventory.js';
 export * from './search.js';
 export * from './reviews.js';
 export * from './admin.js';
+export * from './sellers.js';

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   buildPagination,
+  splitCommission,
   type AdminOrderDetail,
   type AdminOrderSummary,
   type OrderDetail,
@@ -74,6 +75,12 @@ export class OrdersService {
     }));
     const deadline = new Date(Date.now() + this.config.orders.paymentTimeoutMinutes * MINUTE_MS);
 
+    const variantSellers = await this.prisma.productVariant.findMany({
+      where: { id: { in: lines.map((l) => l.variantId) } },
+      select: { id: true, sellerId: true, seller: { select: { commissionBps: true } } },
+    });
+    const sellerOf = new Map(variantSellers.map((v) => [v.id, v]));
+
     const orderId = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
@@ -105,19 +112,28 @@ export class OrdersService {
           customerNote: dto.note ?? null,
           paymentDeadlineAt: deadline,
           items: {
-            create: quote.cart.items.map((item) => ({
-              variantId: item.variantId,
-              productId: item.productId,
-              productTitle: item.productTitle,
-              productSlug: item.productSlug,
-              variantTitle: item.variantTitle,
-              sku: item.sku,
-              imageUrl: item.image?.url ?? null,
-              unitPrice: BigInt(item.unitPrice),
-              compareAtPrice: item.compareAtPrice === null ? null : BigInt(item.compareAtPrice),
-              quantity: item.quantity,
-              lineTotal: BigInt(item.lineTotal),
-            })),
+            create: quote.cart.items.map((item) => {
+              const variant = sellerOf.get(item.variantId);
+              const split = variant?.sellerId
+                ? splitCommission(item.lineTotal, variant.seller?.commissionBps ?? 0)
+                : { commissionAmount: 0, sellerAmount: 0 };
+              return {
+                variantId: item.variantId,
+                productId: item.productId,
+                productTitle: item.productTitle,
+                productSlug: item.productSlug,
+                variantTitle: item.variantTitle,
+                sku: item.sku,
+                imageUrl: item.image?.url ?? null,
+                unitPrice: BigInt(item.unitPrice),
+                compareAtPrice: item.compareAtPrice === null ? null : BigInt(item.compareAtPrice),
+                quantity: item.quantity,
+                lineTotal: BigInt(item.lineTotal),
+                sellerId: variant?.sellerId ?? null,
+                commissionAmount: BigInt(split.commissionAmount),
+                sellerAmount: BigInt(split.sellerAmount),
+              };
+            }),
           },
           statusHistory: {
             create: {
@@ -290,8 +306,12 @@ export class OrdersService {
 
   // --- administration -------------------------------------------------------
 
-  async adminList(query: AdminOrdersQueryDto): Promise<Paginated<AdminOrderSummary>> {
+  async adminList(
+    query: AdminOrdersQueryDto,
+    scope: { sellerId?: string } = {},
+  ): Promise<Paginated<AdminOrderSummary>> {
     const where: Prisma.OrderWhereInput = {};
+    if (scope.sellerId) where.items = { some: { sellerId: scope.sellerId } };
     if (query.status) where.status = query.status;
     if (query.userId) where.userId = query.userId;
     if (query.search) {
@@ -358,33 +378,79 @@ export class OrdersService {
     dto: CreateShipmentDto,
     actorId: string,
   ): Promise<AdminOrderDetail> {
-    const row = await this.requireDetail(orderId);
-    if (!['PROCESSING', 'PACKED', 'SHIPPED'].includes(row.status)) {
+    await this.prisma.$transaction((tx) =>
+      this.registerShipment(tx, orderId, { sellerId: null, ...dto }, actorId),
+    );
+    return this.adminGet(orderId);
+  }
+
+  /**
+   * Records a shipment and advances the order. Platform shipments (no seller)
+   * cover every unshipped item; a seller's shipment covers only their items.
+   * The order becomes SHIPPED once every seller group has dispatched.
+   */
+  async registerShipment(
+    tx: Tx,
+    orderId: string,
+    input: { sellerId: string | null; carrier?: string; trackingCode?: string; note?: string },
+    actorId: string | null,
+  ): Promise<void> {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: { select: { sellerId: true } },
+        shipments: { select: { sellerId: true } },
+      },
+    });
+    if (!order) throw new NotFoundAppException('ORDER_NOT_FOUND', 'سفارش پیدا نشد');
+    if (!['PAID', 'PROCESSING', 'PACKED', 'SHIPPED'].includes(order.status)) {
       throw new UnprocessableAppException(
         'ORDER_NOT_SHIPPABLE',
         'برای این سفارش نمی‌توان مرسوله ثبت کرد',
       );
     }
-    await this.prisma.$transaction(async (tx) => {
-      await tx.shipment.create({
-        data: {
-          orderId,
-          carrier: dto.carrier,
-          trackingCode: dto.trackingCode,
-          shippedAt: new Date(),
-          tracking: {
-            create: { status: 'SHIPPED', description: dto.note ?? 'مرسوله تحویل شرکت حمل شد' },
-          },
-        },
-      });
-      if (row.status !== 'SHIPPED') {
-        const from = row.status;
-        if (from === 'PROCESSING')
-          await this.transition(tx, orderId, 'PROCESSING', 'PACKED', 'بسته‌بندی', actorId);
-        await this.transition(tx, orderId, 'PACKED', 'SHIPPED', dto.note ?? null, actorId);
+    if (input.sellerId) {
+      if (!order.items.some((i) => i.sellerId === input.sellerId)) {
+        throw new NotFoundAppException('ORDER_NOT_FOUND', 'سفارش پیدا نشد');
       }
+      if (order.shipments.some((s) => s.sellerId === input.sellerId)) {
+        throw new UnprocessableAppException(
+          'SHIPMENT_ALREADY_REGISTERED',
+          'برای اقلام شما قبلاً مرسوله ثبت شده است',
+        );
+      }
+    }
+    await tx.shipment.create({
+      data: {
+        orderId,
+        sellerId: input.sellerId,
+        carrier: input.carrier,
+        trackingCode: input.trackingCode,
+        shippedAt: new Date(),
+        tracking: {
+          create: { status: 'SHIPPED', description: input.note ?? 'مرسوله تحویل شرکت حمل شد' },
+        },
+      },
     });
-    return this.adminGet(orderId);
+    if (order.status === 'SHIPPED') return;
+
+    const shippedGroups = new Set(order.shipments.map((s) => s.sellerId));
+    shippedGroups.add(input.sellerId);
+    const platformShipped = shippedGroups.has(null);
+    const allShipped = order.items.every((i) => platformShipped || shippedGroups.has(i.sellerId));
+    let status = order.status;
+    if (status === 'PAID') {
+      await this.transition(tx, orderId, 'PAID', 'PROCESSING', 'شروع پردازش', actorId);
+      status = 'PROCESSING';
+    }
+    if (!allShipped) return;
+    if (status === 'PROCESSING') {
+      await this.transition(tx, orderId, 'PROCESSING', 'PACKED', 'بسته‌بندی', actorId);
+      status = 'PACKED';
+    }
+    if (status === 'PACKED') {
+      await this.transition(tx, orderId, 'PACKED', 'SHIPPED', input.note ?? null, actorId);
+    }
   }
 
   private async requireDetail(orderId: string): Promise<OrderDetailRow> {

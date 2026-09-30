@@ -25,6 +25,7 @@ const cartInclude = {
       variant: {
         include: {
           inventory: true,
+          seller: { select: { id: true, storeName: true, slug: true } },
           product: {
             select: {
               id: true,
@@ -338,6 +339,9 @@ export class CartService {
       availableQuantity: available,
       inStock,
       quantityExceedsStock: exceeds,
+      seller: variant.seller
+        ? { id: variant.seller.id, storeName: variant.seller.storeName, slug: variant.seller.slug }
+        : null,
     };
     if (!sellable)
       warnings.push({

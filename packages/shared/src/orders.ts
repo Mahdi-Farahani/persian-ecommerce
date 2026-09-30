@@ -48,6 +48,8 @@ export interface OrderItemView {
   compareAtPrice: number | null;
   quantity: number;
   lineTotal: number;
+  /** Seller who fulfils this line; null for platform stock. */
+  seller: { id: string; storeName: string; slug: string } | null;
 }
 
 export interface OrderAddressView {
@@ -69,6 +71,8 @@ export interface OrderStatusEvent {
 
 export interface ShipmentView {
   id: string;
+  /** Seller who dispatched it; null for platform shipments. */
+  sellerId: string | null;
   carrier: string | null;
   trackingCode: string | null;
   shippedAt: string | null;

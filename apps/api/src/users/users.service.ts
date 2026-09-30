@@ -250,6 +250,25 @@ export class UsersService {
     return this.toAdminSummary(user);
   }
 
+  /** Adds or removes one role for a user inside a transaction (idempotent). */
+  async setRoleMembership(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    roleName: RoleName,
+    member: boolean,
+  ): Promise<void> {
+    const role = await tx.role.findUniqueOrThrow({ where: { name: roleName } });
+    if (member) {
+      await tx.userRole.upsert({
+        where: { userId_roleId: { userId, roleId: role.id } },
+        update: {},
+        create: { userId, roleId: role.id },
+      });
+    } else {
+      await tx.userRole.deleteMany({ where: { userId, roleId: role.id } });
+    }
+  }
+
   private toAdminSummary(user: UserWithRoles): AdminUserSummary {
     return {
       ...this.toAuthUser(user),

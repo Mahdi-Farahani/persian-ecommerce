@@ -15,7 +15,10 @@ export const orderSummaryInclude = {
 } satisfies Prisma.OrderInclude;
 
 export const orderDetailInclude = {
-  items: { orderBy: { id: 'asc' } },
+  items: {
+    orderBy: { id: 'asc' },
+    include: { seller: { select: { id: true, storeName: true, slug: true } } },
+  },
   statusHistory: { orderBy: { createdAt: 'asc' } },
   payments: { orderBy: { attemptNumber: 'asc' } },
   shipments: {
@@ -111,6 +114,9 @@ export function toOrderDetail(row: OrderDetailRow, now = new Date()): OrderDetai
       compareAtPrice: moneyOrNull(item.compareAtPrice),
       quantity: item.quantity,
       lineTotal: money(item.lineTotal),
+      seller: item.seller
+        ? { id: item.seller.id, storeName: item.seller.storeName, slug: item.seller.slug }
+        : null,
     })),
     address: {
       recipientName: row.recipientName,
@@ -138,6 +144,7 @@ export function toOrderDetail(row: OrderDetailRow, now = new Date()): OrderDetai
     payments: row.payments.map((p) => toPaymentView(p, row.number)),
     shipments: row.shipments.map((s) => ({
       id: s.id,
+      sellerId: s.sellerId,
       carrier: s.carrier,
       trackingCode: s.trackingCode,
       shippedAt: s.shippedAt?.toISOString() ?? null,

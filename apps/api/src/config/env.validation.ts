@@ -155,6 +155,13 @@ export class EnvironmentVariables {
   @MinLength(32)
   PAYMENT_ENCRYPTION_KEY: string;
 
+  /** Default platform commission for new sellers, in basis points (1000 = 10%). */
+  @Transform(toInt)
+  @IsInt()
+  @Min(0)
+  @Max(5_000)
+  MARKETPLACE_DEFAULT_COMMISSION_BPS = 1_000;
+
   /** Enables the mock payment provider (development/tests only; refused in production). */
   @Transform(toBoolean)
   @IsBoolean()

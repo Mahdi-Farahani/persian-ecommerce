@@ -23,9 +23,15 @@ export interface CatalogSeedSummary {
  * Seeds brands, categories, attributes and sample products. Idempotent:
  * records are upserted by slug/SKU and stock is only set for new variants.
  */
+export interface CatalogSeedOptions {
+  /** Reset stock of already-seeded variants to the seed quantities (test fixtures). */
+  resetInventory?: boolean;
+}
+
 export async function seedCatalog(
   prisma: PrismaClient,
   uploadsDir: string,
+  options: CatalogSeedOptions = {},
 ): Promise<CatalogSeedSummary> {
   const storage = new LocalStorageProvider(uploadsDir, '/uploads');
 
@@ -138,12 +144,13 @@ export async function seedCatalog(
 
   // --- products -------------------------------------------------------------
   for (const product of SEED_PRODUCTS) {
-    await upsertProduct(prisma, storage, product, {
-      brandIds,
-      categoryIds,
-      attributeIds,
-      valueIds,
-    });
+    await upsertProduct(
+      prisma,
+      storage,
+      product,
+      { brandIds, categoryIds, attributeIds, valueIds },
+      options,
+    );
   }
 
   await reindexAllProducts(prisma);
@@ -168,6 +175,7 @@ async function upsertProduct(
   storage: LocalStorageProvider,
   product: SeedProduct,
   lookups: Lookups,
+  options: CatalogSeedOptions = {},
 ): Promise<void> {
   const categoryId = lookups.categoryIds.get(product.category);
   if (!categoryId) throw new Error(`Seed category missing: ${product.category}`);
@@ -268,6 +276,18 @@ async function upsertProduct(
       }
     }
 
+    if (existing && options.resetInventory) {
+      await prisma.inventory.upsert({
+        where: { variantId: v.id },
+        update: { stockQuantity: variant.stock, reservedQuantity: 0 },
+        create: {
+          variantId: v.id,
+          stockQuantity: variant.stock,
+          reservedQuantity: 0,
+          lowStockThreshold: 3,
+        },
+      });
+    }
     if (!existing) {
       await prisma.inventory.create({
         data: {

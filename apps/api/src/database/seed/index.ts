@@ -18,6 +18,8 @@ export interface SeedOptions {
   admin?: SeedAdminOptions;
   /** Seed the sample catalogue (defaults to true outside production). */
   catalog?: boolean;
+  /** Reset seeded variants' stock to the seed quantities (integration tests). */
+  resetInventory?: boolean;
   uploadsDir?: string;
 }
 
@@ -31,7 +33,9 @@ export async function seedDatabase(options: SeedOptions = {}): Promise<SeedSumma
     const summary: SeedSummary = { ...rbac, adminEmail: admin.email };
     const wantCatalog = options.catalog ?? process.env['SEED_CATALOG'] !== 'false';
     if (wantCatalog) {
-      summary.catalog = await seedCatalog(prisma, options.uploadsDir ?? defaultUploadsDir());
+      summary.catalog = await seedCatalog(prisma, options.uploadsDir ?? defaultUploadsDir(), {
+        resetInventory: options.resetInventory,
+      });
     }
     return summary;
   } finally {

@@ -54,6 +54,7 @@ model User {
   reviews             Review[]
   moderatedReviews    Review[]       @relation("ReviewModerator")
   wishlistItems       WishlistItem[]
+  seller              Seller?
 
   @@index([status])
   @@index([createdAt])
@@ -459,10 +460,13 @@ model ProductVariant {
   isDefault      Boolean       @default(false)
   weightGrams    Int?
   sortOrder      Int           @default(0)
+  /// Marketplace seller offering this variant; null for platform-owned stock.
+  sellerId       String?       @db.Char(36)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   product               Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+  seller                Seller?                 @relation(fields: [sellerId], references: [id], onDelete: SetNull)
   attributeValues       VariantAttributeValue[]
   images                ProductImage[]
   inventory             Inventory?
@@ -471,6 +475,7 @@ model ProductVariant {
   orderItems            OrderItem[]
 
   @@index([productId, status])
+  @@index([sellerId, status])
   @@map("product_variants")
 }
 
@@ -715,12 +720,20 @@ model OrderItem {
   compareAtPrice BigInt?
   quantity       Int
   lineTotal      BigInt
+  /// Marketplace snapshot: seller at order time, platform commission and the seller's share (IRR).
+  sellerId         String?  @db.Char(36)
+  commissionAmount BigInt   @default(0)
+  sellerAmount     BigInt   @default(0)
+  settlementId     String?  @db.Char(36)
 
-  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  seller     Seller?         @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  settlement Settlement?     @relation(fields: [settlementId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([variantId])
+  @@index([sellerId, settlementId])
   @@map("order_items")
 }
 
@@ -742,6 +755,8 @@ model OrderStatusHistory {
 model Shipment {
   id           String    @id @default(uuid(7)) @db.Char(36)
   orderId      String    @db.Char(36)
+  /// Seller who dispatched it; null for platform shipments.
+  sellerId     String?   @db.Char(36)
   carrier      String?   @db.VarChar(100)
   trackingCode String?   @db.VarChar(100)
   shippedAt    DateTime?
@@ -750,9 +765,11 @@ model Shipment {
   updatedAt    DateTime  @updatedAt
 
   order    Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seller   Seller?            @relation(fields: [sellerId], references: [id], onDelete: SetNull)
   tracking ShipmentTracking[]
 
   @@index([orderId])
+  @@index([sellerId])
   @@map("shipments")
 }
 
@@ -933,4 +950,80 @@ model WishlistItem {
   @@id([userId, productId])
   @@index([userId, createdAt])
   @@map("wishlist_items")
+}
+
+// ---------------------------------------------------------------------------
+// Marketplace: sellers, offers (variants with sellerId) and settlements
+// ---------------------------------------------------------------------------
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+model Seller {
+  id              String       @id @default(uuid(7)) @db.Char(36)
+  userId          String       @unique @db.Char(36)
+  storeName       String       @unique @db.VarChar(150)
+  slug            String       @unique @db.VarChar(180)
+  description     String?      @db.VarChar(1000)
+  status          SellerStatus @default(PENDING)
+  /// Platform commission in basis points (1000 = 10%).
+  commissionBps   Int          @default(1000)
+  contactPhone    String       @db.VarChar(20)
+  contactEmail    String?      @db.VarChar(255)
+  legalName       String?      @db.VarChar(255)
+  nationalId      String?      @db.VarChar(20)
+  /// Payout IBAN; masked in API responses.
+  iban            String?      @db.VarChar(34)
+  province        String?      @db.VarChar(100)
+  city            String?      @db.VarChar(100)
+  addressLine     String?      @db.VarChar(500)
+  rejectionReason String?      @db.VarChar(500)
+  approvedAt      DateTime?
+  suspendedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variants    ProductVariant[]
+  orderItems  OrderItem[]
+  shipments   Shipment[]
+  settlements Settlement[]
+
+  @@index([status])
+  @@map("sellers")
+}
+
+enum SettlementStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+/// Payout batch for a seller: delivered order items not yet settled.
+model Settlement {
+  id               String           @id @default(uuid(7)) @db.Char(36)
+  sellerId         String           @db.Char(36)
+  status           SettlementStatus @default(PENDING)
+  grossAmount      BigInt
+  commissionAmount BigInt
+  netAmount        BigInt
+  itemCount        Int
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  note             String?          @db.VarChar(500)
+  paymentReference String?          @db.VarChar(100)
+  paidAt           DateTime?
+  createdById      String?          @db.Char(36)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  seller Seller      @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  items  OrderItem[]
+
+  @@index([sellerId, status])
+  @@map("settlements")
 }

@@ -25,6 +25,7 @@ import { OrdersModule } from './orders/orders.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { ReviewsModule } from './reviews/reviews.module.js';
 import { SearchModule } from './search/search.module.js';
+import { SellersModule } from './sellers/sellers.module.js';
 import { WishlistModule } from './wishlist/wishlist.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { RbacModule } from './rbac/rbac.module.js';
@@ -67,6 +68,7 @@ const DEFAULT_REQUESTS_PER_MINUTE = 300;
     ReviewsModule,
     WishlistModule,
     AdminModule,
+    SellersModule,
     ScheduleModule.forRoot(),
   ],
   providers: [

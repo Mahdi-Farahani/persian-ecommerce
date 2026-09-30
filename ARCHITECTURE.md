@@ -557,3 +557,17 @@ starts a payment attempt through the provider abstraction in
   to the gateway and renders `/payment/{success,failure,pending}` from the
   backend status; the admin panel manages gateways, orders and payments with
   granular permissions and audit logs.
+
+## Marketplace (as built)
+
+Multi-seller support keeps a single shared catalogue: a seller's offer is a
+`ProductVariant` with a `sellerId`, so pricing, stock reservation, cart,
+checkout and payments are unchanged. `OrdersService.placeOrder` snapshots
+the seller and the commission split per line; `registerShipment` advances an
+order only when every seller group (platform included) has dispatched.
+Sellers reach the platform through `/seller/*` (`SellersModule`), which
+resolves the caller's approved seller record on every request and scopes
+all queries by `sellerId`; the SELLER role is granted and revoked together
+with the approval status. Settlements are payout batches of delivered,
+unsettled items; real bank transfers happen outside the platform and are
+recorded by reference.
