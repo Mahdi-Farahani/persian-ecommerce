@@ -181,3 +181,67 @@ export const reviewSchema = yup.object({
     .max(REVIEW_BODY_MAX, v.maxLength(REVIEW_BODY_MAX)),
 });
 export type ReviewFormValues = yup.InferType<typeof reviewSchema>;
+
+// ---------------------------------------------------------------------------
+// Marketplace: seller application / profile
+// ---------------------------------------------------------------------------
+
+export const SELLER_STORE_NAME_MIN = 3;
+export const SELLER_STORE_NAME_MAX = 150;
+export const SELLER_DESCRIPTION_MAX = 1000;
+export const SELLER_NATIONAL_ID_REGEX = /^\d{10,11}$/;
+export const SELLER_IBAN_REGEX = /^IR\d{24}$/;
+
+const sv = t.seller.validation;
+
+/** Optional trimmed text; empty strings stay empty so the payload builder can drop them. */
+const optionalText = (max: number) =>
+  yup
+    .string()
+    .transform((s: string) => (s ?? '').trim())
+    .max(max, v.maxLength(max))
+    .default('');
+
+export const sellerApplicationSchema = yup.object({
+  storeName: yup
+    .string()
+    .transform((s: string) => s.trim())
+    .required(v.required)
+    .min(SELLER_STORE_NAME_MIN, sv.storeName)
+    .max(SELLER_STORE_NAME_MAX, sv.storeName),
+  description: optionalText(SELLER_DESCRIPTION_MAX),
+  contactPhone: yup
+    .string()
+    .required(v.required)
+    .transform((value: string) => normalizeIranMobile(value) ?? toEnglishDigits(value.trim()))
+    .matches(IRAN_MOBILE_REGEX, v.mobile),
+  contactEmail: yup
+    .string()
+    .transform((s: string) => (s ?? '').trim().toLowerCase())
+    .test('email', v.email, (value) => !value || yup.string().email().isValidSync(value))
+    .max(255, v.maxLength(255))
+    .default(''),
+  legalName: optionalText(255),
+  nationalId: yup
+    .string()
+    .transform((s: string) => toEnglishDigits((s ?? '').trim()))
+    .test('national-id', sv.nationalId, (value) => !value || SELLER_NATIONAL_ID_REGEX.test(value))
+    .default(''),
+  iban: yup
+    .string()
+    .transform((s: string) => toEnglishDigits((s ?? '').replace(/\s+/g, '')).toUpperCase())
+    .test('iban', sv.iban, (value) => !value || SELLER_IBAN_REGEX.test(value))
+    .default(''),
+  province: yup
+    .string()
+    .transform((s: string) => (s ?? '').trim())
+    .test(
+      'province',
+      v.required,
+      (value) => !value || (IRAN_PROVINCES as readonly string[]).includes(value),
+    )
+    .default(''),
+  city: optionalText(100),
+  addressLine: optionalText(500),
+});
+export type SellerApplicationFormValues = yup.InferType<typeof sellerApplicationSchema>;

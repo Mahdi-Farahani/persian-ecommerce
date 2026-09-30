@@ -1,13 +1,15 @@
-import { toPersianDigits, type OrderItemView } from '@pe/shared';
+import { formatToman, toPersianDigits, type SellerOrderItemView } from '@pe/shared';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Price } from '@/components/catalog/price';
-import { SellerLine } from '@/components/catalog/seller-line';
 import { t } from '@/i18n';
 import { assetUrl } from '@/lib/assets';
+import { SellerBadge } from './badge';
 
-/** Line items of an order (customer and admin views share this list). */
-export function OrderItemsList({ items }: { items: OrderItemView[] }) {
+const copy = t.seller.orders;
+
+/** The seller's own lines of an order with the commission split per line. */
+export function SellerOrderItems({ items }: { items: SellerOrderItemView[] }) {
   return (
     <ul className="divide-y divide-border rounded-lg border border-border">
       {items.map((item) => {
@@ -39,16 +41,16 @@ export function OrderItemsList({ items }: { items: OrderItemView[] }) {
                 {' · '}
                 <span dir="ltr">{item.sku}</span>
               </p>
-              <SellerLine seller={item.seller} className="mt-0.5" />
+              <p className="mt-1 text-xs text-ink-muted">
+                {copy.commission}: {formatToman(item.commissionAmount)} · {copy.sellerTotal}:{' '}
+                <span className="font-medium text-ink">{formatToman(item.sellerAmount)}</span>
+              </p>
             </div>
-            <div className="text-end">
+            <div className="flex flex-col items-end gap-1 text-end">
               <Price amount={item.lineTotal} size="sm" />
-              {item.quantity > 1 ? (
-                <p className="text-xs text-ink-muted">
-                  {toPersianDigits(item.quantity)} ×{' '}
-                  <Price amount={item.unitPrice} compareAt={item.compareAtPrice} size="sm" />
-                </p>
-              ) : null}
+              <SellerBadge tone={item.settlementId ? 'success' : 'neutral'}>
+                {item.settlementId ? copy.settled : copy.unsettled}
+              </SellerBadge>
             </div>
           </li>
         );

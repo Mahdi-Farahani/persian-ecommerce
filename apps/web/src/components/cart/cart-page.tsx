@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Price } from '@/components/catalog/price';
+import { SellerLine } from '@/components/catalog/seller-line';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -104,6 +105,7 @@ export function CartPage({ initialCart }: { initialCart: CartView | null }) {
                     <p className="text-xs text-ink-muted" dir="ltr">
                       {item.sku}
                     </p>
+                    <SellerLine seller={item.seller} />
                     {!sellable ? (
                       <p className="text-xs text-accent-600">
                         {item.availableQuantity === 0 ? t.cart.outOfStock : t.cart.unavailable}

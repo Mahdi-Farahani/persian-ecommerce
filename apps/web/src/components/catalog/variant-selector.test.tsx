@@ -1,7 +1,8 @@
 import type { ProductDetail, VariantDetail } from '@pe/shared';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { t } from '@/i18n';
 import { Price } from './price';
 import { initialVariant, VariantSelector } from './variant-selector';
 
@@ -13,6 +14,7 @@ function variant(
 ): VariantDetail {
   return {
     id: partial.id,
+    seller: partial.seller ?? null,
     sku: `SKU-${partial.id}`,
     barcode: null,
     title: null,
@@ -22,7 +24,6 @@ function variant(
     status: 'ACTIVE',
     isDefault: partial.isDefault ?? false,
     weightGrams: null,
-    seller: partial.seller ?? null,
     attributes: [
       {
         attributeId: COLOR,
@@ -135,6 +136,57 @@ describe('VariantSelector', () => {
     await user.click(screen.getByRole('button', { name: '۲۵۶' }));
     expect(screen.getByText(/SKU-v2/)).toBeInTheDocument();
     expect(screen.getByText('تنها ۲ عدد باقی مانده')).toBeInTheDocument();
+  });
+});
+
+const sellerA = { id: 's1', storeName: 'فروشگاه الف', slug: 'store-a' };
+const sellerB = { id: 's2', storeName: 'فروشگاه ب', slug: 'store-b' };
+
+/** Same attribute combination offered by the platform and two marketplace sellers. */
+const multiSellerProduct: ProductDetail = {
+  ...product,
+  variants: [
+    variant({ id: 'p', color: 'white', storage: '128', price: 1_100_000, isDefault: true }),
+    variant({
+      id: 'a',
+      color: 'white',
+      storage: '128',
+      price: 900_000,
+      inStock: false,
+      availableQuantity: 0,
+      seller: sellerA,
+    }),
+    variant({ id: 'b', color: 'white', storage: '128', price: 950_000, seller: sellerB }),
+    variant({ id: 'black', color: 'black', storage: '128', price: 1_000_000, seller: sellerA }),
+  ],
+};
+
+describe('VariantSelector with several sellers', () => {
+  it('starts on the cheapest in-stock seller and switches within the combination', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<VariantSelector product={multiSellerProduct} onVariantChange={onChange} />);
+    // Seller A is cheaper but out of stock; seller B wins over the platform's price.
+    expect(screen.getByText(/SKU-b/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'فروشگاه ب' })).toHaveAttribute(
+      'href',
+      '/sellers/store-b',
+    );
+    const list = screen.getByRole('region', { name: t.seller.storefront.otherSellers });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(list).getByRole('button', { name: /فروشگاه ب/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await user.click(within(list).getByRole('button', { name: `انتخاب ${t.app.name}` }));
+    expect(screen.getByText(/SKU-p/)).toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'p' }));
+
+    // Changing an attribute re-applies the cheapest in-stock rule for the new combination.
+    await user.click(screen.getByRole('button', { name: 'مشکی' }));
+    expect(screen.getByText(/SKU-black/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: t.seller.storefront.otherSellers })).toBeNull();
   });
 });
 
