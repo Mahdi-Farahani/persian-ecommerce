@@ -3,6 +3,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AttributesModule } from './attributes/attributes.module.js';
+import { AdminModule } from './admin/admin.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { BrandsModule } from './brands/brands.module.js';
 import { CartModule } from './cart/cart.module.js';
@@ -22,7 +23,9 @@ import { HealthModule } from './health/health.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
+import { ReviewsModule } from './reviews/reviews.module.js';
 import { SearchModule } from './search/search.module.js';
+import { WishlistModule } from './wishlist/wishlist.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { RbacModule } from './rbac/rbac.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -61,6 +64,9 @@ const DEFAULT_REQUESTS_PER_MINUTE = 300;
     OrdersModule,
     PaymentsModule,
     SearchModule,
+    ReviewsModule,
+    WishlistModule,
+    AdminModule,
     ScheduleModule.forRoot(),
   ],
   providers: [

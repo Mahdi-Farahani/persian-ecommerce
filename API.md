@@ -418,3 +418,29 @@ Errors: `ORDER_NOT_PAYABLE`, `ORDER_PAYMENT_EXPIRED`, `PAYMENT_PROVIDER_UNAVAILA
 | POST | `/admin/payment-gateways/:provider/test`, `.../test-payment` | `payment_gateway.test` |
 
 See `docs/payments/` for the provider contract, security model and reconciliation procedures.
+
+## Reviews & wishlist (as built)
+
+| Method | Path | Auth | Notes |
+| ------ | ---- | ---- | ----- |
+| GET | `/products/:productId/reviews` (`page`, `limit`, `sort=newest|highest|lowest`) | optional | approved reviews; `isMine` for the viewer |
+| GET | `/products/:productId/reviews/summary` | optional | rating average/count, 1–5 star distribution, viewer eligibility (`canReview`, `hasPurchased`, `reason`) and the viewer's own review |
+| POST | `/products/:productId/reviews` `{ rating 1-5, title, body }` | user | one per product, status `PENDING`; `isVerifiedPurchase` from paid orders; 409 `REVIEW_ALREADY_EXISTS` |
+| PATCH | `/reviews/:id` | owner | edit; returns to `PENDING` and leaves the rating until re-approved |
+| DELETE | `/reviews/:id` | owner | 204 |
+| GET | `/reviews/me` | user | my reviews with status and moderation note |
+| GET | `/admin/reviews` (`status`, `productId`, `search`) | `reviews.moderate` | pending first |
+| GET | `/admin/reviews/:id` | `reviews.moderate` | |
+| PATCH | `/admin/reviews/:id/status` `{ status: APPROVED|REJECTED, note? }` | `reviews.moderate` | audited; recomputes `ratingAverage`/`ratingCount` from approved reviews |
+| GET | `/wishlist`, `/wishlist/ids` | user | product cards / ids |
+| POST | `/wishlist/:productId` | user | idempotent add (max 200) |
+| DELETE | `/wishlist/:productId` | user | idempotent remove |
+| POST | `/wishlist/:productId/move-to-cart` | user | adds the default purchasable variant to the cart, removes from the wishlist; 422 `PRODUCT_UNAVAILABLE` |
+
+## Admin dashboard & audit (as built)
+
+| Method | Path | Permission | Notes |
+| ------ | ---- | ---------- | ----- |
+| GET | `/admin/dashboard` | `reports.view` | `DashboardMetrics`: sales windows (today / 7d / 30d / all time: paid orders, revenue, average order value), 14-day daily series, order counts by status, payment counts, customers, catalogue counts, inventory summary, pending reviews, 5 recent orders, 10 recent audit entries |
+| GET | `/admin/audit-logs` (`action` prefix, `entityType`, `entityId`, `actorId`, `from`, `to`, `page`, `limit`) | `audit_logs.view` | newest first; metadata is secret-redacted |
+| GET | `/admin/audit-logs/actions` | `audit_logs.view` | distinct action names for filters |

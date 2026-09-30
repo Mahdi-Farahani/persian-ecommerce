@@ -10,3 +10,5 @@ export * from './orders.js';
 export * from './payments.js';
 export * from './inventory.js';
 export * from './search.js';
+export * from './reviews.js';
+export * from './admin.js';

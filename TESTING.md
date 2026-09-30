@@ -230,3 +230,17 @@ as deployed.
   (`orders/order-status.spec.ts`).
 * The test environment sets `PAYMENT_MOCK_ENABLED=true` and
   `PAYMENT_MOCK_DEFAULT=true` (`apps/api/test/setup-integration.ts`).
+
+### Reviews, wishlist, search and inventory coverage (as built)
+
+* `apps/api/test/reviews-wishlist.integration-spec.ts`: anonymous
+  eligibility, one review per customer, verified-purchase flag via a paid
+  mock order, hidden pending reviews, approve/reject with audit and rating
+  recomputation, owner-only edit/delete, wishlist add/list/remove/move-to-cart
+  and privacy between users.
+* `apps/api/test/search.integration-spec.ts`: Persian/English/partial/
+  Arabic-script queries, typo tolerance, filters, sorting, pagination, empty
+  results, autocomplete and admin reindex.
+* `apps/api/test/inventory.integration-spec.ts`: concurrent checkouts,
+  sale/return/cancel ledger effects, manual adjustments, list/summary
+  endpoints.

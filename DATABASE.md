@@ -418,3 +418,15 @@ payment updates does not depend on snapshot reads: every write path locks the
 rows it changes (`InventoryService.lock`, payment claim updates) inside one
 transaction. `test/inventory.integration-spec.ts` covers four concurrent
 checkouts contending for three units.
+
+## Reviews & wishlist (as built)
+
+* `reviews`: one row per `(productId, userId)` (unique), `rating` 1–5,
+  `title`, `body`, `status` (`PENDING → APPROVED | REJECTED`),
+  `isVerifiedPurchase` (author had a paid order containing the product when
+  submitting), moderation note/actor/time. Indexes on
+  `(productId, status, createdAt)`, `(status, createdAt)`, `(userId, createdAt)`.
+  `products.ratingAverage` / `ratingCount` are recomputed from `APPROVED`
+  rows on every status change, edit and delete.
+* `wishlist_items`: composite key `(userId, productId)`, cascade on user and
+  product deletion, capped at 200 per user in the service.
