@@ -9,6 +9,7 @@ import {
 import { resolveUniqueSlug } from '../common/utils/slug.util.js';
 import type { Prisma, ProductStatus } from '../generated/prisma/client.js';
 import { InventoryService } from '../inventory/inventory.service.js';
+import { SearchService } from '../search/search.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   AdminProductsQueryDto,
@@ -42,7 +43,14 @@ export class ProductsAdminService {
     private readonly prisma: PrismaService,
     private readonly categories: CategoriesService,
     private readonly inventory: InventoryService,
+    private readonly search: SearchService,
   ) {}
+
+  /** Refreshes the search index after a mutation and returns the detail view. */
+  private async touched(productId: string): Promise<ProductDetail> {
+    await this.search.reindex(productId);
+    return this.get(productId);
+  }
 
   async list(query: AdminProductsQueryDto): Promise<Paginated<ProductCard>> {
     const where: Prisma.ProductWhereInput = {};
@@ -126,7 +134,7 @@ export class ProductsAdminService {
       await this.recalculatePriceRange(tx, product.id);
       return product.id;
     });
-    return this.get(productId);
+    return this.touched(productId);
   }
 
   async update(id: string, dto: UpdateProductDto): Promise<ProductDetail> {
@@ -147,7 +155,7 @@ export class ProductsAdminService {
       if (attributes) await this.replaceAttributes(tx, id, attributes);
       if (specifications) await this.replaceSpecifications(tx, id, specifications);
     });
-    return this.get(id);
+    return this.touched(id);
   }
 
   async setStatus(id: string, status: ProductStatus): Promise<ProductDetail> {
@@ -170,7 +178,7 @@ export class ProductsAdminService {
         publishedAt: status === 'ACTIVE' && !current.publishedAt ? new Date() : undefined,
       },
     });
-    return this.get(id);
+    return this.touched(id);
   }
 
   async remove(id: string): Promise<void> {
@@ -191,7 +199,7 @@ export class ProductsAdminService {
       await this.insertVariant(tx, productId, dto, count, count === 0);
       await this.recalculatePriceRange(tx, productId);
     });
-    return this.get(productId);
+    return this.touched(productId);
   }
 
   async updateVariant(variantId: string, dto: UpdateVariantDto): Promise<ProductDetail> {
@@ -250,7 +258,7 @@ export class ProductsAdminService {
         await this.inventory.ensure(tx, variantId, lowStockThreshold);
       await this.recalculatePriceRange(tx, variant.productId);
     });
-    return this.get(variant.productId);
+    return this.touched(variant.productId);
   }
 
   async removeVariant(variantId: string): Promise<ProductDetail> {
@@ -275,7 +283,7 @@ export class ProductsAdminService {
       }
       await this.recalculatePriceRange(tx, variant.productId);
     });
-    return this.get(variant.productId);
+    return this.touched(variant.productId);
   }
 
   // --- images ------------------------------------------------------------------
@@ -298,7 +306,7 @@ export class ProductsAdminService {
         },
       });
     });
-    return this.get(productId);
+    return this.touched(productId);
   }
 
   async updateImage(imageId: string, dto: UpdateProductImageDto): Promise<ProductDetail> {
@@ -337,7 +345,7 @@ export class ProductsAdminService {
         this.prisma.productImage.update({ where: { id }, data: { sortOrder: index } }),
       ),
     );
-    return this.get(productId);
+    return this.touched(productId);
   }
 
   async removeImage(imageId: string): Promise<ProductDetail> {

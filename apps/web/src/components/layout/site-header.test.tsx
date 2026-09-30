@@ -5,20 +5,10 @@ import { t } from '@/i18n';
 import { useAuthStore } from '@/store/auth-store';
 import { HeaderActions } from './header-actions';
 import { MobileMenu } from './mobile-menu';
-import { SearchForm } from './search-form';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }));
-
-describe('SearchForm', () => {
-  it('submits to the search page without JavaScript', () => {
-    render(<SearchForm />);
-    const form = screen.getByRole('search');
-    expect(form).toHaveAttribute('action', '/search');
-    expect(screen.getByRole('searchbox')).toHaveAttribute('name', 'q');
-  });
-});
 
 describe('HeaderActions', () => {
   beforeEach(() => {

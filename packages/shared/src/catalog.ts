@@ -23,6 +23,7 @@ export const AttributeTypes = ['SELECT', 'TEXT', 'NUMBER', 'BOOLEAN'] as const;
 export type AttributeType = (typeof AttributeTypes)[number];
 
 export const ProductSortOptions = [
+  'relevance',
   'newest',
   'price_asc',
   'price_desc',

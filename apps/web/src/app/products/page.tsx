@@ -42,6 +42,7 @@ export default async function ProductsPage({
         basePath="/products"
         searchParams={params}
         title={title}
+        defaultSort={filters.sort}
       />
     </Container>
   );

@@ -53,7 +53,8 @@ export async function getBrand(slug: string): Promise<BrandDetail | null> {
   );
 }
 
-export async function listProducts(filters: ProductListFilters): Promise<Paginated<ProductCard>> {
+/** Serialises listing filters into the query shape shared by `/products` and `/search`. */
+function listQuery(filters: ProductListFilters): Record<string, QueryValue> {
   const query: Record<string, QueryValue> = {
     category: filters.category,
     brand: Array.isArray(filters.brand) ? filters.brand.join(',') : filters.brand,
@@ -68,8 +69,20 @@ export async function listProducts(filters: ProductListFilters): Promise<Paginat
   for (const [slug, value] of Object.entries(filters.attr ?? {})) {
     query[`attr[${slug}]`] = Array.isArray(value) ? value.join(',') : value;
   }
+  return query;
+}
+
+export async function listProducts(filters: ProductListFilters): Promise<Paginated<ProductCard>> {
   return publicApi<Paginated<ProductCard>>('/products', {
-    query,
+    query: listQuery(filters),
+    next: { revalidate: 30, tags: ['products'] },
+  });
+}
+
+/** Full-text search; same filters and result shape as the product listing. */
+export async function searchProducts(filters: ProductListFilters): Promise<Paginated<ProductCard>> {
+  return publicApi<Paginated<ProductCard>>('/search', {
+    query: listQuery(filters),
     next: { revalidate: 30, tags: ['products'] },
   });
 }

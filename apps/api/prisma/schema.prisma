@@ -368,6 +368,8 @@ model Product {
   weightGrams      Int?
   seoTitle         String?       @db.VarChar(255)
   seoDescription   String?       @db.VarChar(500)
+  /// Normalised text (title, English title, brand, category, SKUs, short description) for FULLTEXT search.
+  searchText       String?       @db.Text
   publishedAt      DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -385,6 +387,7 @@ model Product {
   @@index([minPrice])
   @@index([createdAt])
   @@index([publishedAt])
+  @@fulltext([searchText])
   @@map("products")
 }
 

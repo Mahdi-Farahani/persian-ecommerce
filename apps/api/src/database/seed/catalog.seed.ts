@@ -1,6 +1,7 @@
 import path from 'node:path';
 import sharp from 'sharp';
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { reindexAllProducts } from '../../search/search-index.js';
 import { LocalStorageProvider } from '../../storage/local-storage.provider.js';
 import {
   SEED_ATTRIBUTES,
@@ -144,6 +145,8 @@ export async function seedCatalog(
       valueIds,
     });
   }
+
+  await reindexAllProducts(prisma);
 
   return {
     brands: SEED_BRANDS.length,

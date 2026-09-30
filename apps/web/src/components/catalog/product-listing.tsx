@@ -3,53 +3,31 @@ import type {
   FilterableAttribute,
   Paginated,
   ProductCard,
-  ProductListFilters,
+  ProductSort,
 } from '@pe/shared';
 import { formatPersianNumber } from '@pe/shared';
+import type { ReactNode } from 'react';
 import { Pagination } from '@/components/ui/pagination';
 import { t } from '@/i18n';
+import { listingPageHref, type SearchParamsRecord } from '@/lib/catalog/listing';
 import { FilterSidebar } from './filter-sidebar';
 import { ProductGrid } from './product-grid';
 import { SortSelect } from './sort-select';
+
+export { parseListFilters } from '@/lib/catalog/listing';
 
 interface ProductListingProps {
   result: Paginated<ProductCard>;
   brands: BrandSummary[];
   attributes: FilterableAttribute[];
+  /** Path the filter, sort and pagination links are built under. */
   basePath: string;
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: SearchParamsRecord;
   title?: string;
-}
-
-/** Reads listing filters from Next.js search params. */
-export function parseListFilters(
-  searchParams: Record<string, string | string[] | undefined>,
-): ProductListFilters {
-  const first = (key: string): string | undefined => {
-    const value = searchParams[key];
-    return Array.isArray(value) ? value[0] : value;
-  };
-  const attr: Record<string, string> = {};
-  for (const [key, value] of Object.entries(searchParams)) {
-    const match = /^attr\[(.+)\]$/.exec(key);
-    if (match?.[1] && value) attr[match[1]] = Array.isArray(value) ? value.join(',') : value;
-  }
-  const page = Number(first('page') ?? 1);
-  const sort = first('sort');
-  return {
-    brand: first('brand'),
-    minPrice: first('minPrice') ? Number(first('minPrice')) : undefined,
-    maxPrice: first('maxPrice') ? Number(first('maxPrice')) : undefined,
-    inStock: first('inStock') === 'true',
-    attr: Object.keys(attr).length ? attr : undefined,
-    sort:
-      sort && ['newest', 'price_asc', 'price_desc', 'popular', 'rating'].includes(sort)
-        ? (sort as ProductListFilters['sort'])
-        : 'newest',
-    q: first('q'),
-    page: Number.isFinite(page) && page > 0 ? page : 1,
-    limit: 24,
-  };
+  /** Sort shown as selected when the URL carries none. */
+  defaultSort?: ProductSort;
+  /** Rendered in place of the grid when there are no results. */
+  empty?: ReactNode;
 }
 
 export function ProductListing({
@@ -59,17 +37,11 @@ export function ProductListing({
   basePath,
   searchParams,
   title,
+  defaultSort,
+  empty,
 }: ProductListingProps) {
-  const hrefFor = (page: number): string => {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries(searchParams)) {
-      if (key === 'page' || value === undefined) continue;
-      next.set(key, Array.isArray(value) ? value.join(',') : value);
-    }
-    if (page > 1) next.set('page', String(page));
-    const qs = next.toString();
-    return qs ? `${basePath}?${qs}` : basePath;
-  };
+  const hrefFor = listingPageHref(basePath, searchParams);
+  const isEmpty = result.items.length === 0;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
@@ -82,9 +54,9 @@ export function ProductListing({
               {t.catalog.resultsCount(formatPersianNumber(result.pagination.total))}
             </p>
           </div>
-          <SortSelect />
+          <SortSelect defaultSort={defaultSort} />
         </div>
-        <ProductGrid products={result.items} />
+        {isEmpty && empty ? empty : <ProductGrid products={result.items} />}
         <div className="mt-8">
           <Pagination pagination={result.pagination} hrefFor={hrefFor} />
         </div>
