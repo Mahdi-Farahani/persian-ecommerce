@@ -17,6 +17,10 @@ export const AdminPermissions = {
   paymentGatewayUpdate: 'payment_gateway.update',
   paymentGatewayTest: 'payment_gateway.test',
   reviewsModerate: 'reviews.moderate',
+  discountsManage: 'discounts.manage',
+  settingsManage: 'settings.manage',
+  reportsView: 'reports.view',
+  auditLogsView: 'audit_logs.view',
 } as const;
 
 /** Permissions that grant access to the admin shell at all. */
@@ -28,6 +32,10 @@ const ENTRY_PERMISSIONS = [
   AdminPermissions.paymentView,
   AdminPermissions.paymentGatewayView,
   AdminPermissions.reviewsModerate,
+  AdminPermissions.discountsManage,
+  AdminPermissions.settingsManage,
+  AdminPermissions.reportsView,
+  AdminPermissions.auditLogsView,
 ] as const;
 
 export interface AdminNavItem {
@@ -72,11 +80,26 @@ export const adminNavItems: readonly AdminNavItem[] = [
     permissions: [AdminPermissions.paymentGatewayView],
   },
   {
+    href: '/admin/coupons',
+    label: adminFa.nav.coupons,
+    permissions: [AdminPermissions.discountsManage],
+  },
+  {
+    href: '/admin/shipping-methods',
+    label: adminFa.nav.shippingMethods,
+    permissions: [AdminPermissions.settingsManage, AdminPermissions.ordersView],
+  },
+  {
     href: '/admin/reviews',
     label: adminFa.nav.reviews,
     permissions: [AdminPermissions.reviewsModerate],
   },
   { href: '/admin/users', label: adminFa.nav.users, permissions: [AdminPermissions.usersView] },
+  {
+    href: '/admin/audit-logs',
+    label: adminFa.nav.auditLogs,
+    permissions: [AdminPermissions.auditLogsView],
+  },
 ];
 
 type Principal = Pick<AuthUser, 'permissions' | 'roles'> | null | undefined;

@@ -22,6 +22,7 @@ function variant(
     status: 'ACTIVE',
     isDefault: partial.isDefault ?? false,
     weightGrams: null,
+    seller: partial.seller ?? null,
     attributes: [
       {
         attributeId: COLOR,

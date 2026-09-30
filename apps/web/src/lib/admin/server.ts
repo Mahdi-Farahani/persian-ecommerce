@@ -6,8 +6,10 @@ import type {
   AdminPaymentSummary,
   AdminReviewView,
   AttributeSummary,
+  AuditLogView,
   BrandDetail,
   CategoryNode,
+  DashboardMetrics,
   InventoryItemView,
   InventorySnapshot,
   InventorySummary,
@@ -20,7 +22,7 @@ import type {
 import type { QueryValue } from '@/lib/api/client';
 import { ApiError } from '@/lib/api/errors';
 import { serverApi } from '@/lib/api/server';
-import type { AdminCategory, AdminUser, RoleInfo } from './types';
+import type { AdminCategory, AdminCoupon, AdminShippingMethod, AdminUser, RoleInfo } from './types';
 
 const noStore = { cache: 'no-store' as const };
 
@@ -132,6 +134,35 @@ export async function adminGetReview(id: string): Promise<AdminReviewView | null
 
 export function adminListPaymentGateways() {
   return serverApi<PaymentGatewayAdminView[]>('/admin/payment-gateways', noStore);
+}
+
+export function adminDashboard() {
+  return serverApi<DashboardMetrics>('/admin/dashboard', noStore);
+}
+
+export function adminListAuditLogs(query: Record<string, QueryValue>) {
+  return serverApi<Paginated<AuditLogView>>('/admin/audit-logs', { query, ...noStore });
+}
+
+export function adminAuditLogActions() {
+  return serverApi<string[]>('/admin/audit-logs/actions', noStore);
+}
+
+export function adminListCoupons(query: Record<string, QueryValue>) {
+  return serverApi<Paginated<AdminCoupon>>('/admin/coupons', { query, ...noStore });
+}
+
+export async function adminGetCoupon(id: string): Promise<AdminCoupon | null> {
+  try {
+    return await serverApi<AdminCoupon>(`/admin/coupons/${encodeURIComponent(id)}`, noStore);
+  } catch (error) {
+    if (error instanceof ApiError && error.isNotFound) return null;
+    throw error;
+  }
+}
+
+export function adminListShippingMethods() {
+  return serverApi<AdminShippingMethod[]>('/admin/shipping-methods', noStore);
 }
 
 /** Resolves to null instead of throwing when the caller lacks permission. */

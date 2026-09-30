@@ -7,6 +7,7 @@ import {
 } from '@pe/shared';
 import * as yup from 'yup';
 import { adminFa } from '@/i18n/admin-fa';
+import { CouponTypes } from './types';
 
 const v = adminFa.validation;
 
@@ -226,3 +227,94 @@ export const inventoryAdjustSchema = yup.object({
   note: optionalText(500),
 });
 export type InventoryAdjustFormValues = yup.InferType<typeof inventoryAdjustSchema>;
+
+// ---------------------------------------------------------------------------
+// Coupon
+// ---------------------------------------------------------------------------
+
+const COUPON_CODE_REGEX = /^[A-Z0-9_-]+$/;
+const COUPON_CODE_MIN = 3;
+const COUPON_CODE_MAX = 50;
+const PERCENT_MAX = 100;
+
+/** Optional positive integer (>= 1); empty input is omitted. */
+const optionalPositiveInteger = () => optionalInteger().min(1, v.positive);
+
+/** Optional `datetime-local` value; empty strings become undefined. */
+const optionalDateTime = () =>
+  yup
+    .string()
+    .transform((value: unknown) => (typeof value === 'string' && value.trim() ? value : undefined))
+    .optional();
+
+/**
+ * Coupon form. Money fields are entered in Toman (`*Toman`) and converted to
+ * IRR by the mapper; date fields hold `datetime-local` strings.
+ */
+export const couponSchema = yup.object({
+  code: yup
+    .string()
+    .transform((value: string) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
+    .required(v.required)
+    .min(COUPON_CODE_MIN, v.minLength(COUPON_CODE_MIN))
+    .max(COUPON_CODE_MAX, v.maxLength(COUPON_CODE_MAX))
+    .matches(COUPON_CODE_REGEX, v.couponCode),
+  description: optionalText(255),
+  type: yup
+    .string()
+    .oneOf([...CouponTypes], v.required)
+    .required(v.required),
+  /** Percent for PERCENTAGE coupons, Toman for FIXED ones. */
+  value: requiredInteger()
+    .min(1, v.positive)
+    .when('type', {
+      is: 'PERCENTAGE',
+      then: (schema) => schema.max(PERCENT_MAX, v.percentRange),
+    }),
+  maxDiscountToman: optionalInteger(),
+  minCartToman: optionalInteger(),
+  startsAt: optionalDateTime(),
+  endsAt: optionalDateTime().test('after-start', v.endAfterStart, (value, context) => {
+    const startsAt = (context.parent as { startsAt?: string }).startsAt;
+    if (!value || !startsAt) return true;
+    return new Date(value).getTime() > new Date(startsAt).getTime();
+  }),
+  usageLimit: optionalPositiveInteger(),
+  usageLimitPerUser: optionalPositiveInteger(),
+  isActive: yup.boolean().default(true),
+});
+export type CouponFormValues = yup.InferType<typeof couponSchema>;
+
+// ---------------------------------------------------------------------------
+// Shipping method
+// ---------------------------------------------------------------------------
+
+const SHIPPING_CODE_REGEX = /^[a-z0-9-]+$/;
+const SHIPPING_DAYS_MIN_MAX = 60;
+const SHIPPING_DAYS_MAX_MAX = 90;
+const SORT_ORDER_MAX = 10_000;
+
+/** Shipping method form; fees are entered in Toman and converted by the mapper. */
+export const shippingMethodSchema = yup.object({
+  code: yup
+    .string()
+    .transform((value: string) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    .required(v.required)
+    .min(2, v.minLength(2))
+    .max(50, v.maxLength(50))
+    .matches(SHIPPING_CODE_REGEX, v.shippingCode),
+  name: trimmed().required(v.required).min(2, v.minLength(2)).max(150, v.maxLength(150)),
+  description: optionalText(500),
+  baseFeeToman: requiredInteger(),
+  freeAboveToman: optionalInteger(),
+  estimatedDaysMin: requiredInteger().max(SHIPPING_DAYS_MIN_MAX, v.maxValue(SHIPPING_DAYS_MIN_MAX)),
+  estimatedDaysMax: requiredInteger()
+    .max(SHIPPING_DAYS_MAX_MAX, v.maxValue(SHIPPING_DAYS_MAX_MAX))
+    .test('after-min', v.daysMaxAfterMin, (value, context) => {
+      const min = (context.parent as { estimatedDaysMin?: number }).estimatedDaysMin;
+      return value === undefined || min === undefined || value >= min;
+    }),
+  isActive: yup.boolean().default(true),
+  sortOrder: sortOrder().max(SORT_ORDER_MAX, v.maxValue(SORT_ORDER_MAX)),
+});
+export type ShippingMethodFormValues = yup.InferType<typeof shippingMethodSchema>;

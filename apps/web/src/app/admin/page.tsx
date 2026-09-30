@@ -1,153 +1,287 @@
-import { displayName, formatPersianNumber, hasPermission } from '@pe/shared';
+import { displayName, formatJalaliDateTime, hasPermission, type AuthUser } from '@pe/shared';
 import Link from 'next/link';
+import { KpiCards } from '@/components/admin/dashboard/kpi-cards';
+import { RecentActivity } from '@/components/admin/dashboard/recent-activity';
+import { RecentOrders } from '@/components/admin/dashboard/recent-orders';
+import { SalesChart } from '@/components/admin/dashboard/sales-chart';
+import { StatList, type StatRow } from '@/components/admin/dashboard/stat-list';
+import { Forbidden } from '@/components/admin/forbidden';
 import { PageHeader } from '@/components/admin/page-header';
+import { Alert } from '@/components/ui/alert';
 import { Card, CardTitle } from '@/components/ui/card';
 import { adminFa } from '@/i18n/admin-fa';
 import { AdminPermissions } from '@/lib/admin/navigation';
-import {
-  adminInventorySummary,
-  adminListBrands,
-  adminListCategories,
-  adminListProducts,
-  adminListReviews,
-  adminListUsers,
-  optional,
-} from '@/lib/admin/server';
+import { adminDashboard, optional } from '@/lib/admin/server';
 import { requireUser } from '@/lib/auth/server';
 
 export const metadata = { title: adminFa.dashboard.title };
 
-interface Stat {
-  label: string;
-  value: number | null;
-  href: string;
+const copy = adminFa.dashboard;
+
+function QuickLinks({ user }: { user: AuthUser }) {
+  const can = (permission: string) => hasPermission(user, permission);
+  const links: Array<{ href: string; label: string; show: boolean }> = [
+    {
+      href: '/admin/products/new',
+      label: copy.newProduct,
+      show: can(AdminPermissions.catalogManage),
+    },
+    {
+      href: '/admin/products',
+      label: copy.manageProducts,
+      show: can(AdminPermissions.catalogView),
+    },
+    {
+      href: '/admin/categories',
+      label: copy.manageCategories,
+      show: can(AdminPermissions.catalogView),
+    },
+    { href: '/admin/brands', label: copy.manageBrands, show: can(AdminPermissions.catalogView) },
+    {
+      href: '/admin/attributes',
+      label: copy.manageAttributes,
+      show: can(AdminPermissions.catalogView),
+    },
+    {
+      href: '/admin/inventory',
+      label: copy.manageInventory,
+      show: can(AdminPermissions.inventoryView),
+    },
+    { href: '/admin/users', label: copy.manageUsers, show: can(AdminPermissions.usersView) },
+    { href: '/admin/orders', label: copy.manageOrders, show: can(AdminPermissions.ordersView) },
+    {
+      href: '/admin/payments',
+      label: copy.managePayments,
+      show: can(AdminPermissions.paymentView),
+    },
+    {
+      href: '/admin/settings/payment-gateways',
+      label: copy.managePaymentGateways,
+      show: can(AdminPermissions.paymentGatewayView),
+    },
+    {
+      href: '/admin/coupons',
+      label: copy.manageCoupons,
+      show: can(AdminPermissions.discountsManage),
+    },
+    {
+      href: '/admin/shipping-methods',
+      label: copy.manageShippingMethods,
+      show: can(AdminPermissions.settingsManage) || can(AdminPermissions.ordersView),
+    },
+    {
+      href: '/admin/reviews?status=PENDING',
+      label: copy.manageReviews,
+      show: can(AdminPermissions.reviewsModerate),
+    },
+    {
+      href: '/admin/audit-logs',
+      label: copy.viewAuditLogs,
+      show: can(AdminPermissions.auditLogsView),
+    },
+  ];
+  return (
+    <Card>
+      <CardTitle>{copy.quickLinks}</CardTitle>
+      <ul className="flex flex-wrap gap-2">
+        {links
+          .filter((link) => link.show)
+          .map((link) => (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-medium transition hover:border-brand-400 hover:text-brand-700"
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+      </ul>
+    </Card>
+  );
 }
 
 export default async function AdminDashboardPage() {
   const user = await requireUser('/admin');
-  const canCatalog = hasPermission(user, AdminPermissions.catalogView);
-  const canManageCatalog = hasPermission(user, AdminPermissions.catalogManage);
-  const canUsers = hasPermission(user, AdminPermissions.usersView);
-  const canInventory = hasPermission(user, AdminPermissions.inventoryView);
-  const canReviews = hasPermission(user, AdminPermissions.reviewsModerate);
+  const canReports = hasPermission(user, AdminPermissions.reportsView);
+  const metrics = canReports ? await optional(adminDashboard()) : null;
 
-  const [products, categories, brands, users, inventory, pendingReviews] = await Promise.all([
-    canCatalog ? optional(adminListProducts({ limit: 1 })) : null,
-    canCatalog ? optional(adminListCategories()) : null,
-    canCatalog ? optional(adminListBrands({ limit: 1, includeInactive: 'true' })) : null,
-    canUsers ? optional(adminListUsers({ limit: 1 })) : null,
-    canInventory ? optional(adminInventorySummary()) : null,
-    canReviews ? optional(adminListReviews({ limit: 1, status: 'PENDING' })) : null,
-  ]);
+  if (!canReports || !metrics) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title={copy.title} description={copy.welcome(displayName(user))} />
+        {!canReports ? <Forbidden /> : <Alert tone="warning">{copy.unavailable}</Alert>}
+        <QuickLinks user={user} />
+      </div>
+    );
+  }
 
-  const stats: Stat[] = [
+  const linkIf = (permission: string, href: string) =>
+    hasPermission(user, permission) ? href : undefined;
+  const ordersHref = (status: string) =>
+    linkIf(AdminPermissions.ordersView, `/admin/orders?status=${status}`);
+  const paymentsHref = (status: string) =>
+    linkIf(AdminPermissions.paymentView, `/admin/payments?status=${status}`);
+  const catalogHref = (path: string) => linkIf(AdminPermissions.catalogView, path);
+
+  const pipeline: StatRow[] = [
     {
-      label: adminFa.dashboard.products,
-      value: products?.pagination.total ?? null,
-      href: '/admin/products',
+      label: copy.pipeline.pendingPayment,
+      value: metrics.orders.pendingPayment,
+      href: ordersHref('PENDING_PAYMENT'),
     },
     {
-      label: adminFa.dashboard.categories,
-      value: categories?.length ?? null,
-      href: '/admin/categories',
+      label: copy.pipeline.paid,
+      value: metrics.orders.paid,
+      href: ordersHref('PAID'),
+      alert: true,
     },
     {
-      label: adminFa.dashboard.brands,
-      value: brands?.pagination.total ?? null,
-      href: '/admin/brands',
+      label: copy.pipeline.processing,
+      value: metrics.orders.processing,
+      href: ordersHref('PROCESSING'),
+    },
+    { label: copy.pipeline.packed, value: metrics.orders.packed, href: ordersHref('PACKED') },
+    { label: copy.pipeline.shipped, value: metrics.orders.shipped, href: ordersHref('SHIPPED') },
+    {
+      label: copy.pipeline.deliveredLast30Days,
+      value: metrics.orders.deliveredLast30Days,
+      href: ordersHref('DELIVERED'),
     },
     {
-      label: adminFa.dashboard.users,
-      value: users?.pagination.total ?? null,
-      href: '/admin/users',
+      label: copy.pipeline.cancelledLast30Days,
+      value: metrics.orders.cancelledLast30Days,
+      href: ordersHref('CANCELLED'),
+    },
+    {
+      label: copy.pipeline.returnRequested,
+      value: metrics.orders.returnRequested,
+      href: ordersHref('RETURN_REQUESTED'),
+      alert: true,
     },
   ];
-  if (canInventory) {
-    stats.push({
-      label: adminFa.dashboard.lowStock,
-      value: inventory?.lowStockVariants ?? null,
-      href: '/admin/inventory?lowStock=true',
-    });
-  }
-  if (canReviews) {
-    stats.push({
-      label: adminFa.dashboard.pendingReviews,
-      value: pendingReviews?.pagination.total ?? null,
-      href: '/admin/reviews?status=PENDING',
-    });
-  }
-
-  const quickLinks: Array<{ href: string; label: string; show: boolean }> = [
-    { href: '/admin/products/new', label: adminFa.dashboard.newProduct, show: canManageCatalog },
-    { href: '/admin/products', label: adminFa.dashboard.manageProducts, show: canCatalog },
-    { href: '/admin/categories', label: adminFa.dashboard.manageCategories, show: canCatalog },
-    { href: '/admin/brands', label: adminFa.dashboard.manageBrands, show: canCatalog },
-    { href: '/admin/attributes', label: adminFa.dashboard.manageAttributes, show: canCatalog },
-    { href: '/admin/inventory', label: adminFa.dashboard.manageInventory, show: canInventory },
-    { href: '/admin/users', label: adminFa.dashboard.manageUsers, show: canUsers },
+  const payments: StatRow[] = [
     {
-      href: '/admin/orders',
-      label: adminFa.dashboard.manageOrders,
-      show: hasPermission(user, AdminPermissions.ordersView),
+      label: copy.payments.paidLast7Days,
+      value: metrics.payments.paidLast7Days,
+      href: paymentsHref('PAID'),
     },
     {
-      href: '/admin/payments',
-      label: adminFa.dashboard.managePayments,
-      show: hasPermission(user, AdminPermissions.paymentView),
+      label: copy.payments.failedLast7Days,
+      value: metrics.payments.failedLast7Days,
+      href: paymentsHref('FAILED'),
     },
     {
-      href: '/admin/settings/payment-gateways',
-      label: adminFa.dashboard.managePaymentGateways,
-      show: hasPermission(user, AdminPermissions.paymentGatewayView),
+      label: copy.payments.refundedLast30Days,
+      value: metrics.payments.refundedLast30Days,
+      href: paymentsHref('REFUNDED'),
+    },
+  ];
+  const usersHref = linkIf(AdminPermissions.usersView, '/admin/users');
+  const customers: StatRow[] = [
+    { label: copy.customers.total, value: metrics.customers.total, href: usersHref },
+    { label: copy.customers.newLast7Days, value: metrics.customers.newLast7Days },
+    { label: copy.customers.newLast30Days, value: metrics.customers.newLast30Days },
+  ];
+  const catalog: StatRow[] = [
+    {
+      label: copy.catalog.activeProducts,
+      value: metrics.catalog.activeProducts,
+      href: catalogHref('/admin/products?status=ACTIVE'),
     },
     {
-      href: '/admin/reviews?status=PENDING',
-      label: adminFa.dashboard.manageReviews,
-      show: canReviews,
+      label: copy.catalog.draftProducts,
+      value: metrics.catalog.draftProducts,
+      href: catalogHref('/admin/products?status=DRAFT'),
+    },
+    {
+      label: copy.catalog.brands,
+      value: metrics.catalog.brands,
+      href: catalogHref('/admin/brands'),
+    },
+    {
+      label: copy.catalog.categories,
+      value: metrics.catalog.categories,
+      href: catalogHref('/admin/categories'),
+    },
+  ];
+  const inventoryHref = (query?: string) =>
+    linkIf(AdminPermissions.inventoryView, `/admin/inventory${query ? `?${query}` : ''}`);
+  const inventory: StatRow[] = [
+    {
+      label: adminFa.inventory.summary.trackedVariants,
+      value: metrics.inventory.trackedVariants,
+      href: inventoryHref(),
+    },
+    {
+      label: adminFa.inventory.summary.lowStockVariants,
+      value: metrics.inventory.lowStockVariants,
+      href: inventoryHref('lowStock=true'),
+      alert: true,
+    },
+    {
+      label: adminFa.inventory.summary.outOfStockVariants,
+      value: metrics.inventory.outOfStockVariants,
+      href: inventoryHref('outOfStock=true'),
+      alert: true,
+    },
+    { label: adminFa.inventory.summary.reservedUnits, value: metrics.inventory.reservedUnits },
+    { label: adminFa.inventory.summary.stockUnits, value: metrics.inventory.stockUnits },
+  ];
+  const reviewsHref = (status: string) =>
+    linkIf(AdminPermissions.reviewsModerate, `/admin/reviews?status=${status}`);
+  const reviews: StatRow[] = [
+    {
+      label: copy.reviews.pending,
+      value: metrics.reviews.pending,
+      href: reviewsHref('PENDING'),
+      alert: true,
+    },
+    {
+      label: copy.reviews.approvedLast30Days,
+      value: metrics.reviews.approvedLast30Days,
+      href: reviewsHref('APPROVED'),
     },
   ];
 
   return (
-    <div>
+    <div className="flex flex-col gap-6">
       <PageHeader
-        title={adminFa.dashboard.title}
-        description={adminFa.dashboard.welcome(displayName(user))}
+        title={copy.title}
+        description={`${copy.welcome(displayName(user))} · ${copy.generatedAt(formatJalaliDateTime(metrics.generatedAt))}`}
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
-          <Link key={stat.href} href={stat.href} className="block">
-            <Card className="h-full transition hover:border-brand-400">
-              <p className="text-sm text-ink-muted">{stat.label}</p>
-              <p className="mt-2 text-3xl font-bold tabular-nums">
-                {stat.value === null ? (
-                  <span className="text-base font-normal text-ink-muted">
-                    {adminFa.dashboard.unavailable}
-                  </span>
-                ) : (
-                  formatPersianNumber(stat.value)
-                )}
-              </p>
-            </Card>
-          </Link>
-        ))}
+      <KpiCards sales={metrics.sales} />
+      <SalesChart points={metrics.dailySales} />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <StatList title={copy.pipeline.title} rows={pipeline} className="md:row-span-2" />
+        <StatList title={copy.payments.title} rows={payments} />
+        <StatList title={copy.customers.title} rows={customers} />
+        <StatList title={copy.catalog.title} rows={catalog} />
+        <StatList
+          title={copy.inventory.title}
+          rows={inventory}
+          footer={
+            inventoryHref() ? { href: '/admin/inventory', label: copy.inventory.link } : undefined
+          }
+        />
+        <StatList
+          title={copy.reviews.title}
+          rows={reviews}
+          footer={
+            reviewsHref('PENDING')
+              ? { href: '/admin/reviews?status=PENDING', label: copy.reviews.link }
+              : undefined
+          }
+        />
       </div>
-      <Card className="mt-6">
-        <CardTitle>{adminFa.dashboard.quickLinks}</CardTitle>
-        <ul className="flex flex-wrap gap-2">
-          {quickLinks
-            .filter((link) => link.show)
-            .map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-medium transition hover:border-brand-400 hover:text-brand-700"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-        </ul>
-      </Card>
+      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+        <RecentOrders orders={metrics.recentOrders} />
+        <RecentActivity
+          entries={metrics.recentActivity}
+          canViewAll={hasPermission(user, AdminPermissions.auditLogsView)}
+        />
+      </div>
+      <QuickLinks user={user} />
     </div>
   );
 }

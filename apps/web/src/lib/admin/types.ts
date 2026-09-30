@@ -188,4 +188,71 @@ export interface PermissionInfo {
   description: string;
 }
 
+export const CouponTypes = ['PERCENTAGE', 'FIXED'] as const;
+export type CouponType = (typeof CouponTypes)[number];
+
+/** Coupon row as returned by `GET /admin/coupons`; money fields are integers in IRR. */
+export interface AdminCoupon {
+  id: string;
+  code: string;
+  description: string | null;
+  type: CouponType;
+  /** Percent (1-100) for PERCENTAGE, IRR amount for FIXED. */
+  value: number;
+  maxDiscountAmount: number | null;
+  minCartAmount: number | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  usageLimit: number | null;
+  usageLimitPerUser: number | null;
+  usedCount: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Payload for `POST /admin/coupons` and `PATCH /admin/coupons/:id`. */
+export interface CouponInput {
+  code: string;
+  description?: string;
+  type: CouponType;
+  value: number;
+  maxDiscountAmount?: number | null;
+  minCartAmount?: number | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  usageLimit?: number | null;
+  usageLimitPerUser?: number | null;
+  isActive: boolean;
+}
+
+/** Shipping method as returned by `GET /admin/shipping-methods`; money in IRR. */
+export interface AdminShippingMethod {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  baseFee: number;
+  freeAboveAmount: number | null;
+  estimatedDaysMin: number;
+  estimatedDaysMax: number;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Payload for `POST /admin/shipping-methods` and `PATCH /admin/shipping-methods/:id`. */
+export interface ShippingMethodInput {
+  code: string;
+  name: string;
+  description?: string;
+  baseFee: number;
+  freeAboveAmount?: number | null;
+  estimatedDaysMin: number;
+  estimatedDaysMax: number;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 export type { ProductStatus, UserStatus, VariantStatus };

@@ -39,6 +39,7 @@ function cartWith(quantity: number): CartView {
         availableQuantity: 5,
         inStock: true,
         quantityExceedsStock: false,
+        seller: null,
       },
     ],
     coupon: null,
