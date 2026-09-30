@@ -111,7 +111,10 @@ export interface AdminSettlementView extends SettlementView {
 
 export interface SellerDashboard {
   seller: SellerProfileView;
-  sales: { last7Days: { orders: number; revenue: number }; last30Days: { orders: number; revenue: number } };
+  sales: {
+    last7Days: { orders: number; revenue: number };
+    last30Days: { orders: number; revenue: number };
+  };
   awaitingShipment: number;
   offers: { total: number; active: number; lowStock: number; outOfStock: number };
   settlements: { pendingAmount: number; pendingItems: number; paidAmount: number };
