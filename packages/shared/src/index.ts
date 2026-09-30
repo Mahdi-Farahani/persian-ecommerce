@@ -7,3 +7,6 @@ export * from './iran.js';
 export * from './catalog.js';
 export * from './cart.js';
 export * from './orders.js';
+export * from './payments.js';
+export * from './inventory.js';
+export * from './search.js';

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 const items = [
   { href: '/account', label: t.account.profile },
+  { href: '/account/orders', label: t.account.orders },
   { href: '/account/addresses', label: t.account.addresses },
   { href: '/account/security', label: t.account.security },
 ] as const;
@@ -20,7 +21,10 @@ export function AccountNav() {
     >
       <ul className="flex gap-1 overflow-x-auto lg:flex-col">
         {items.map((item) => {
-          const active = pathname === item.href;
+          const active =
+            item.href === '/account'
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <li key={item.href} className="shrink-0">
               <Link

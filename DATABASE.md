@@ -372,3 +372,49 @@ Seed scripts must be deterministic and safe to rerun where possible.
 * `coupons`: `PERCENTAGE` (0-100) or `FIXED` (IRR) with optional cap, minimum
   cart amount, validity window and usage limits.
 * `shipping_methods`: flat `baseFee` with optional `freeAboveAmount`.
+
+## Orders & payments (as built)
+
+* `orders`: sequential `number` (rendered `PE-000042`), `status` enum
+  (`PENDING_PAYMENT → PAID → PROCESSING → PACKED → SHIPPED → DELIVERED`,
+  plus `CANCELLED`, `RETURN_REQUESTED`, `RETURNED`, `REFUNDED`; transitions
+  in `orders/order-status.ts`), integer IRR money (`subtotal`, `discount`,
+  `shippingFee`, `total`), snapshots of the address and shipping method,
+  `paymentDeadlineAt` (unpaid orders are cancelled after it). Indexes on
+  `(userId, createdAt)`, `(status, createdAt)`, `(status, paymentDeadlineAt)`.
+* `order_items`: immutable line snapshots (`variantId` nullable with
+  `SET NULL` so deleting a variant keeps history).
+* `order_status_history`: append-only audit trail of transitions.
+* `shipments` / `shipment_tracking`: carrier, tracking code, events.
+* `payments`: one row per attempt, unique `(orderId, attemptNumber)` and
+  unique `requestId` (idempotency key); `provider`, `environment`, `status`
+  (`INITIATED, REDIRECTED, CALLBACK_RECEIVED, VERIFYING, PAID, FAILED,
+  CANCELLED, EXPIRED, REFUNDED`), `providerAuthority`,
+  `providerTransactionId`, masked PAN, error code/message, redacted
+  callback/verification JSON, timestamps. Index `(provider, providerAuthority)`
+  serves callback lookup.
+* `payment_transactions`: immutable ledger of provider interactions
+  (`PAYMENT, REFUND, REVERSE, SETTLEMENT, INQUIRY`) with success flag,
+  provider reference and redacted payload.
+* `payment_provider_configs`: registry row per provider — `enabled`,
+  `isDefault` (one at most, enforced in code), `environment`,
+  `credentialsEncrypted` (AES-256-GCM), `configuration` JSON, last test result.
+* Inventory: placing an order reserves stock (`reservedQuantity`) inside the
+  same transaction; payment success commits the sale, cancellation/expiry
+  releases it, returns restock — all through the `inventory_transactions`
+  ledger.
+
+## Transaction isolation (as built)
+
+MariaDB 11 ships with `innodb_snapshot_isolation=ON`. Under the default
+REPEATABLE READ level a `SELECT … FOR UPDATE` issued after any earlier read in
+the same transaction fails with error 1020 ("Record has changed since last
+read") when another session changed the row in between — exactly what happens
+when two checkouts compete for the same stock. The Prisma adapter therefore
+starts every pooled session with
+`SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED`
+(`apps/api/src/prisma/prisma.service.ts`). Correctness of stock, order and
+payment updates does not depend on snapshot reads: every write path locks the
+rows it changes (`InventoryService.lock`, payment claim updates) inside one
+transaction. `test/inventory.integration-spec.ts` covers four concurrent
+checkouts contending for three units.

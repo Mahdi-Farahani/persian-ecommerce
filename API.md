@@ -366,3 +366,55 @@ availability; unsellable lines are excluded from totals and reported in
 | GET/PATCH/DELETE | `/admin/coupons/:id` | `discounts.manage` |
 | GET | `/admin/shipping-methods` | `orders.view` |
 | POST/PATCH/DELETE | `/admin/shipping-methods[/:id]` | `settings.manage` |
+
+## Inventory (admin)
+
+| Method | Path | Permission | Notes |
+| ------ | ---- | ---------- | ----- |
+| GET | `/admin/inventory` (`search`, `lowStock`, `outOfStock`, `productId`, `page`, `limit`) | `inventory.view` | one row per variant, lowest stock first, with product context |
+| GET | `/admin/inventory/summary` | `inventory.view` | tracked / low-stock / out-of-stock variants, stock and reserved units |
+| GET | `/admin/inventory/:variantId` | `inventory.view` | `InventoryItemView`: snapshot (`stock`, `reserved`, `available`, threshold, `lowStock`) plus SKU and product identity |
+| GET | `/admin/inventory/:variantId/transactions` | `inventory.view` | latest 50 ledger entries |
+| PATCH | `/admin/inventory/:variantId/adjust` `{ quantity, type?, note? }` | `inventory.manage` | signed change (`ADJUSTMENT`/`PURCHASE`/`RETURN`), refuses negative stock or stock below reservations, audited |
+| PATCH | `/admin/inventory/:variantId/threshold` `{ lowStockThreshold }` | `inventory.manage` | audited |
+
+## Orders (user)
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| POST | `/checkout` | `{ addressId, shippingMethodCode, note? }` → `OrderDetail` (201). Re-quotes, reserves stock, snapshots items, converts the cart. Status `PENDING_PAYMENT` with `paymentDeadlineAt` |
+| GET | `/orders` | my orders, paginated |
+| GET | `/orders/:id` | `OrderDetail` incl. items, address, status history, payments, shipments, `payable`, `cancellable` |
+| POST | `/orders/:id/cancel` | cancel my unpaid order (releases the reservation) |
+
+## Payments
+
+| Method | Path | Auth | Notes |
+| ------ | ---- | ---- | ----- |
+| GET | `/payments/providers` | public | enabled gateways the runtime allows, default first |
+| POST | `/payments` | user | `{ orderId, provider? }` → `{ payment, redirectUrl, redirectMethod, redirectFields? }`; resumes an open attempt on the same provider |
+| GET | `/payments/:id` | owner | `PaymentView` (result pages poll this; never trust URL params) |
+| GET | `/payments/:id/status` | owner | status subset |
+| POST | `/payments/:id/verify` | owner | re-verify with the provider after a lost callback |
+| GET/POST | `/payments/:slug/callback` | public | provider callback (`zarinpal`, `snapp-pay`, `digipay`, `torob-pay`, `mock`); verifies server-side, answers `303` to `/payment/{success|failure|pending}?paymentId=` |
+| GET | `/payments/mock/gateway` | public | mock gateway page (only when `PAYMENT_MOCK_ENABLED`, never in production) |
+
+Errors: `ORDER_NOT_PAYABLE`, `ORDER_PAYMENT_EXPIRED`, `PAYMENT_PROVIDER_UNAVAILABLE` (422), `PAYMENT_CREATE_FAILED` / `PAYMENT_VERIFY_FAILED` (502, `details.code` normalized + `details.providerCode`).
+
+## Orders & payments (admin)
+
+| Method | Path | Permission |
+| ------ | ---- | ---------- |
+| GET | `/admin/orders` (`status`, `search`, `userId`, `from`, `to`) | `orders.view` |
+| GET | `/admin/orders/:id` | `orders.view` |
+| PATCH | `/admin/orders/:id/status` `{ status, note? }` (validated transitions, audited) | `orders.manage` |
+| POST | `/admin/orders/:id/shipments` `{ carrier?, trackingCode?, note? }` (→ `SHIPPED`, 201) | `orders.manage` |
+| GET | `/admin/payments` (`status`, `provider`, `orderId`, `search`) | `payment.view` |
+| GET | `/admin/payments/:id` (ledger + redacted payloads) | `payment.view` |
+| POST | `/admin/payments/:id/reconcile` | `payment.reconcile` |
+| POST | `/admin/payments/:id/refund` `{ reason? }` | `payment.refund` |
+| GET | `/admin/payment-gateways`, `/admin/payment-gateways/:provider` (masked credentials) | `payment_gateway.view` |
+| PATCH | `/admin/payment-gateways/:provider` `{ enabled?, isDefault?, environment?, credentials?, settings?, confirmProduction? }` | `payment_gateway.update` |
+| POST | `/admin/payment-gateways/:provider/test`, `.../test-payment` | `payment_gateway.test` |
+
+See `docs/payments/` for the provider contract, security model and reconciliation procedures.

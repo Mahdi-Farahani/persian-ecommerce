@@ -21,6 +21,8 @@ import { AppConfigModule } from './config/config.module.js';
 import { HealthModule } from './health/health.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { OrdersModule } from './orders/orders.module.js';
+import { PaymentsModule } from './payments/payments.module.js';
+import { SearchModule } from './search/search.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { RbacModule } from './rbac/rbac.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -57,6 +59,8 @@ const DEFAULT_REQUESTS_PER_MINUTE = 300;
     CartModule,
     CheckoutModule,
     OrdersModule,
+    PaymentsModule,
+    SearchModule,
     ScheduleModule.forRoot(),
   ],
   providers: [

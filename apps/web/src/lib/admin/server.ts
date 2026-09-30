@@ -1,9 +1,18 @@
 import 'server-only';
 import type {
+  AdminOrderDetail,
+  AdminOrderSummary,
+  AdminPaymentDetail,
+  AdminPaymentSummary,
   AttributeSummary,
   BrandDetail,
   CategoryNode,
+  InventoryItemView,
+  InventorySnapshot,
+  InventorySummary,
+  InventoryTransactionView,
   Paginated,
+  PaymentGatewayAdminView,
   ProductCard,
   ProductDetail,
 } from '@pe/shared';
@@ -49,6 +58,66 @@ export function adminListUsers(query: Record<string, QueryValue>) {
 
 export function adminListRoles() {
   return serverApi<RoleInfo[]>('/admin/roles', noStore);
+}
+
+export function adminListOrders(query: Record<string, QueryValue>) {
+  return serverApi<Paginated<AdminOrderSummary>>('/admin/orders', { query, ...noStore });
+}
+
+export async function adminGetOrder(id: string): Promise<AdminOrderDetail | null> {
+  try {
+    return await serverApi<AdminOrderDetail>(`/admin/orders/${encodeURIComponent(id)}`, noStore);
+  } catch (error) {
+    if (error instanceof ApiError && error.isNotFound) return null;
+    throw error;
+  }
+}
+
+export function adminListPayments(query: Record<string, QueryValue>) {
+  return serverApi<Paginated<AdminPaymentSummary>>('/admin/payments', { query, ...noStore });
+}
+
+export async function adminGetPayment(id: string): Promise<AdminPaymentDetail | null> {
+  try {
+    return await serverApi<AdminPaymentDetail>(
+      `/admin/payments/${encodeURIComponent(id)}`,
+      noStore,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.isNotFound) return null;
+    throw error;
+  }
+}
+
+export function adminListInventory(query: Record<string, QueryValue>) {
+  return serverApi<Paginated<InventoryItemView>>('/admin/inventory', { query, ...noStore });
+}
+
+export function adminInventorySummary() {
+  return serverApi<InventorySummary>('/admin/inventory/summary', noStore);
+}
+
+export async function adminGetInventory(variantId: string): Promise<InventorySnapshot | null> {
+  try {
+    return await serverApi<InventorySnapshot>(
+      `/admin/inventory/${encodeURIComponent(variantId)}`,
+      noStore,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.isNotFound) return null;
+    throw error;
+  }
+}
+
+export function adminInventoryTransactions(variantId: string) {
+  return serverApi<InventoryTransactionView[]>(
+    `/admin/inventory/${encodeURIComponent(variantId)}/transactions`,
+    noStore,
+  );
+}
+
+export function adminListPaymentGateways() {
+  return serverApi<PaymentGatewayAdminView[]>('/admin/payment-gateways', noStore);
 }
 
 /** Resolves to null instead of throwing when the caller lacks permission. */

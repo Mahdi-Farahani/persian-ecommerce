@@ -87,6 +87,7 @@ function UserMenu() {
 
   const links: Array<{ href: string; label: string }> = [
     { href: '/account', label: t.account.profile },
+    { href: '/account/orders', label: t.account.orders },
     { href: '/account/addresses', label: t.account.addresses },
     { href: '/account/security', label: t.account.security },
   ];

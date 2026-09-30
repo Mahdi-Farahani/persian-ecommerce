@@ -207,3 +207,26 @@ Layout:
 The Nest integration harness (`test/utils/test-app.ts`) applies the same
 `configureApp()` used in production so filters, pipes and headers are tested
 as deployed.
+
+### Orders & payments coverage (as built)
+
+* `apps/api/test/orders-payments.integration-spec.ts` boots the real app
+  against the test database and walks: checkout → stock reservation →
+  mock gateway → callback → server-side verification → order `PAID` →
+  duplicate callback idempotency; failed attempt + retry; user
+  cancellation; unknown/mismatched callbacks; amount mismatch (tampered
+  adapter registered through `PaymentProviderFactory.register`); customer
+  re-verify; order expiry releasing stock, a late payment flagged
+  `ORDER_NOT_PENDING` and its refund; admin status/shipment transitions,
+  reconciliation, encrypted gateway credentials (masked, never returned,
+  production confirmation), connection and test payments, RBAC (403s).
+* `apps/api/src/payments/providers/provider-contract.suite.ts` is run for
+  every adapter (create, invalid credentials, provider error, callback
+  parsing, verify success/failure/duplicate, transaction mismatch, network
+  failure) with a stubbed `fetch`; ZarinPal fixtures use the JSON shapes
+  verified from the official SDK sources.
+* Unit specs cover credential encryption (`credentials-crypto.service.spec.ts`),
+  amount conversion (`amount.util.spec.ts`) and the order state machine
+  (`orders/order-status.spec.ts`).
+* The test environment sets `PAYMENT_MOCK_ENABLED=true` and
+  `PAYMENT_MOCK_DEFAULT=true` (`apps/api/test/setup-integration.ts`).

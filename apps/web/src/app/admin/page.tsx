@@ -5,6 +5,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { adminFa } from '@/i18n/admin-fa';
 import { AdminPermissions } from '@/lib/admin/navigation';
 import {
+  adminInventorySummary,
   adminListBrands,
   adminListCategories,
   adminListProducts,
@@ -26,12 +27,14 @@ export default async function AdminDashboardPage() {
   const canCatalog = hasPermission(user, AdminPermissions.catalogView);
   const canManageCatalog = hasPermission(user, AdminPermissions.catalogManage);
   const canUsers = hasPermission(user, AdminPermissions.usersView);
+  const canInventory = hasPermission(user, AdminPermissions.inventoryView);
 
-  const [products, categories, brands, users] = await Promise.all([
+  const [products, categories, brands, users, inventory] = await Promise.all([
     canCatalog ? optional(adminListProducts({ limit: 1 })) : null,
     canCatalog ? optional(adminListCategories()) : null,
     canCatalog ? optional(adminListBrands({ limit: 1, includeInactive: 'true' })) : null,
     canUsers ? optional(adminListUsers({ limit: 1 })) : null,
+    canInventory ? optional(adminInventorySummary()) : null,
   ]);
 
   const stats: Stat[] = [
@@ -56,6 +59,13 @@ export default async function AdminDashboardPage() {
       href: '/admin/users',
     },
   ];
+  if (canInventory) {
+    stats.push({
+      label: adminFa.dashboard.lowStock,
+      value: inventory?.lowStockVariants ?? null,
+      href: '/admin/inventory?lowStock=true',
+    });
+  }
 
   const quickLinks: Array<{ href: string; label: string; show: boolean }> = [
     { href: '/admin/products/new', label: adminFa.dashboard.newProduct, show: canManageCatalog },
@@ -63,7 +73,23 @@ export default async function AdminDashboardPage() {
     { href: '/admin/categories', label: adminFa.dashboard.manageCategories, show: canCatalog },
     { href: '/admin/brands', label: adminFa.dashboard.manageBrands, show: canCatalog },
     { href: '/admin/attributes', label: adminFa.dashboard.manageAttributes, show: canCatalog },
+    { href: '/admin/inventory', label: adminFa.dashboard.manageInventory, show: canInventory },
     { href: '/admin/users', label: adminFa.dashboard.manageUsers, show: canUsers },
+    {
+      href: '/admin/orders',
+      label: adminFa.dashboard.manageOrders,
+      show: hasPermission(user, AdminPermissions.ordersView),
+    },
+    {
+      href: '/admin/payments',
+      label: adminFa.dashboard.managePayments,
+      show: hasPermission(user, AdminPermissions.paymentView),
+    },
+    {
+      href: '/admin/settings/payment-gateways',
+      label: adminFa.dashboard.managePaymentGateways,
+      show: hasPermission(user, AdminPermissions.paymentGatewayView),
+    },
   ];
 
   return (

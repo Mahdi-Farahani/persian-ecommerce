@@ -262,6 +262,25 @@ Runtime switches on the API container:
 * `SEED_ON_START` (default `true`) — idempotent seed of roles/permissions/admin.
 * `SWAGGER_ENABLED` (default `false` in production).
 
+Payments (see `docs/payments/README.md`):
+
+* `PAYMENT_ENCRYPTION_KEY` (required, ≥32 chars) encrypts gateway credentials
+  at rest. Generate with
+  `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`.
+  Rotating it requires re-entering credentials in the admin panel.
+* `API_PUBLIC_URL` — absolute API base gateways call back to (defaults to
+  `APP_URL/api/v1`). Register `<API_PUBLIC_URL>/payments/<provider>/callback`
+  with each provider.
+* `ORDER_PAYMENT_TIMEOUT_MINUTES` (default 30).
+* `PAYMENT_MOCK_ENABLED` / `PAYMENT_MOCK_DEFAULT` — development only; the mock
+  gateway is refused whenever the API runs with `NODE_ENV=production`. A local
+  Compose stack that should exercise checkout end-to-end sets
+  `API_NODE_ENV=development` in `.env`; a real deployment keeps the default
+  (`production`).
+* Optional bootstrap of a provider on first boot, e.g. `ZARINPAL_ENABLED`,
+  `ZARINPAL_ENVIRONMENT`, `ZARINPAL_MERCHANT_ID`. Afterwards configure
+  gateways at `/admin/settings/payment-gateways`.
+
 ## TLS
 
 Copy `infra/nginx/conf.d/tls.conf.example` over `default.conf`, place

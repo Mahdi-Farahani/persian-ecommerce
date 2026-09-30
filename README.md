@@ -72,7 +72,8 @@ pnpm format:check         # prettier
 ## Docker Compose (production-like)
 
 ```bash
-cp .env.example .env      # set MARIADB_* passwords, APP_URL, SEED_ADMIN_PASSWORD
+cp .env.example .env      # set MARIADB_* passwords, APP_URL, SEED_ADMIN_PASSWORD,
+                          # JWT_ACCESS_SECRET and PAYMENT_ENCRYPTION_KEY
 docker compose build
 docker compose up -d
 docker compose ps
@@ -87,6 +88,14 @@ Nginx listens on `NGINX_HTTP_PORT` (default 80). Routes:
 The API container applies migrations on start (`RUN_MIGRATIONS_ON_START`) and
 optionally seeds base data (`SEED_ON_START`). See `DEPLOYMENT.md` for TLS,
 backups and rollback.
+
+## Payments
+
+Gateways (ZarinPal, SnappPay, DigiPay, TorobPay, plus a mock for development)
+sit behind a provider abstraction and are configured at
+`/admin/settings/payment-gateways` with credentials encrypted at rest. Set
+`PAYMENT_MOCK_ENABLED=true` (and `PAYMENT_MOCK_DEFAULT=true`) locally to pay
+through the built-in mock gateway. Details: `docs/payments/README.md`.
 
 ## Money
 

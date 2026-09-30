@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 const ACCESS_COOKIE = 'pe_access';
 const REFRESH_COOKIE = 'pe_refresh';
-const PROTECTED_PREFIXES = ['/account', '/checkout', '/admin', '/seller'];
+const PROTECTED_PREFIXES = ['/account', '/checkout', '/payment', '/admin', '/seller'];
 const GUEST_ONLY_PATHS = ['/login', '/register'];
 
 function internalApiUrl(): string {

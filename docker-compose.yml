@@ -42,7 +42,9 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      NODE_ENV: production
+      # Keep `production` for real deployments. `development` only exists so a
+      # local Compose stack can run end-to-end with the mock payment gateway.
+      NODE_ENV: ${API_NODE_ENV:-production}
       API_PORT: 4000
       API_GLOBAL_PREFIX: api/v1
       APP_URL: ${APP_URL:-http://localhost:8080}
@@ -59,6 +61,7 @@ services:
       API_PUBLIC_URL: ${API_PUBLIC_URL:-${APP_URL:-http://localhost:8080}/api/v1}
       PAYMENT_ENCRYPTION_KEY: ${PAYMENT_ENCRYPTION_KEY:?set PAYMENT_ENCRYPTION_KEY in .env}
       PAYMENT_MOCK_ENABLED: ${PAYMENT_MOCK_ENABLED:-false}
+      PAYMENT_MOCK_DEFAULT: ${PAYMENT_MOCK_DEFAULT:-false}
       RUN_MIGRATIONS_ON_START: ${RUN_MIGRATIONS_ON_START:-true}
       SEED_ON_START: ${SEED_ON_START:-true}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}

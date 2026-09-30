@@ -9,6 +9,13 @@ export const AdminPermissions = {
   usersView: 'users.view',
   usersManage: 'users.manage',
   ordersView: 'orders.view',
+  ordersManage: 'orders.manage',
+  paymentView: 'payment.view',
+  paymentReconcile: 'payment.reconcile',
+  paymentRefund: 'payment.refund',
+  paymentGatewayView: 'payment_gateway.view',
+  paymentGatewayUpdate: 'payment_gateway.update',
+  paymentGatewayTest: 'payment_gateway.test',
 } as const;
 
 /** Permissions that grant access to the admin shell at all. */
@@ -17,6 +24,8 @@ const ENTRY_PERMISSIONS = [
   AdminPermissions.usersView,
   AdminPermissions.inventoryView,
   AdminPermissions.ordersView,
+  AdminPermissions.paymentView,
+  AdminPermissions.paymentGatewayView,
 ] as const;
 
 export interface AdminNavItem {
@@ -43,6 +52,22 @@ export const adminNavItems: readonly AdminNavItem[] = [
     href: '/admin/attributes',
     label: adminFa.nav.attributes,
     permissions: [AdminPermissions.catalogView],
+  },
+  {
+    href: '/admin/inventory',
+    label: adminFa.nav.inventory,
+    permissions: [AdminPermissions.inventoryView],
+  },
+  { href: '/admin/orders', label: adminFa.nav.orders, permissions: [AdminPermissions.ordersView] },
+  {
+    href: '/admin/payments',
+    label: adminFa.nav.payments,
+    permissions: [AdminPermissions.paymentView],
+  },
+  {
+    href: '/admin/settings/payment-gateways',
+    label: adminFa.nav.paymentGateways,
+    permissions: [AdminPermissions.paymentGatewayView],
   },
   { href: '/admin/users', label: adminFa.nav.users, permissions: [AdminPermissions.usersView] },
 ];

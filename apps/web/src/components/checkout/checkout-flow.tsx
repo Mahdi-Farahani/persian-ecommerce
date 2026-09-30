@@ -3,9 +3,10 @@
 import type { CartView, CheckoutQuote, ShippingMethodView } from '@pe/shared';
 import { formatPersianNumber, formatToman, toPersianDigits } from '@pe/shared';
 import Link from 'next/link';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AddressForm } from '@/components/account/address-form';
 import { Price } from '@/components/catalog/price';
+import { PaymentStep } from '@/components/checkout/payment-step';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,15 +23,9 @@ const STEPS: Step[] = ['address', 'shipping', 'review'];
 interface CheckoutFlowProps {
   initialCart: CartView;
   initialAddresses: Address[];
-  /** Rendered in the review step once the quote is valid (payment step). */
-  renderPlaceOrder?: (quote: CheckoutQuote) => ReactNode;
 }
 
-export function CheckoutFlow({
-  initialCart,
-  initialAddresses,
-  renderPlaceOrder,
-}: CheckoutFlowProps) {
+export function CheckoutFlow({ initialCart, initialAddresses }: CheckoutFlowProps) {
   const cart = useCartStore((state) => state.cart) ?? initialCart;
   const setCart = useCartStore((state) => state.setCart);
   const [step, setStep] = useState<Step>('address');
@@ -301,12 +296,22 @@ export function CheckoutFlow({
                     </li>
                   ))}
                 </ul>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={() => setStep('shipping')}>
-                    {t.checkout.back}
-                  </Button>
-                  {renderPlaceOrder && quote.canPlaceOrder ? renderPlaceOrder(quote) : null}
-                </div>
+                {quote.canPlaceOrder ? (
+                  <PaymentStep
+                    quote={quote}
+                    actions={
+                      <Button variant="outline" onClick={() => setStep('shipping')}>
+                        {t.checkout.back}
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => setStep('shipping')}>
+                      {t.checkout.back}
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-ink-muted">{t.checkout.loading}</p>

@@ -531,3 +531,29 @@ the `STORAGE_PROVIDER` factory without touching business modules.
 The web app references uploads by relative path (`/uploads/...`); nginx
 proxies that prefix to the API and `next.config.ts` rewrites it to the API
 origin so the Next.js image optimizer can fetch same-origin sources.
+
+## Orders & payments (as built)
+
+Checkout is two steps owned by the backend: `POST /checkout` turns the
+server-recomputed quote into an order (one transaction: reserve stock,
+snapshot items, convert the cart, count the coupon) and `POST /payments`
+starts a payment attempt through the provider abstraction in
+`apps/api/src/payments` (see `docs/payments/PAYMENT-ARCHITECTURE.md`).
+
+* `OrdersService` owns the order state machine (`order-status.ts`) and calls
+  `InventoryService` for the side effects (commit / release / restock).
+  `OrdersScheduler` cancels unpaid orders after `ORDER_PAYMENT_TIMEOUT_MINUTES`.
+* `PaymentsService` orchestrates create → callback → verify → finalize →
+  settle/refund/reconcile and is the only caller of `PaymentProvider`
+  adapters, which are built by `PaymentProviderFactory` from the encrypted
+  DB registry (`ProviderRegistryService`). Verification is claimed with a
+  conditional update so duplicate callbacks never double-finalize; the
+  browser redirect is never trusted as proof of payment.
+* Adapters: ZarinPal (verified against official SDK sources), SnappPay,
+  DigiPay, TorobPay (configurable, gated until contract documentation is
+  confirmed) and Mock (dev/test). Each adapter must pass the shared provider
+  contract test suite.
+* The storefront selects a provider from `GET /payments/providers`, redirects
+  to the gateway and renders `/payment/{success,failure,pending}` from the
+  backend status; the admin panel manages gateways, orders and payments with
+  granular permissions and audit logs.
