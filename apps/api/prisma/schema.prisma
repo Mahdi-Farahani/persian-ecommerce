@@ -51,6 +51,9 @@ model User {
   auditLogs           AuditLog[]
   carts               Cart[]
   orders              Order[]
+  reviews             Review[]
+  moderatedReviews    Review[]       @relation("ReviewModerator")
+  wishlistItems       WishlistItem[]
 
   @@index([status])
   @@index([createdAt])
@@ -380,6 +383,8 @@ model Product {
   variants       ProductVariant[]
   attributes     ProductAttributeValue[]
   specifications ProductSpecification[]
+  reviews        Review[]
+  wishlistItems  WishlistItem[]
 
   @@index([status])
   @@index([categoryId, status])
@@ -877,4 +882,55 @@ model PaymentProviderConfig {
   updatedAt            DateTime           @updatedAt
 
   @@map("payment_provider_configs")
+}
+
+// ---------------------------------------------------------------------------
+// Reviews & wishlist
+// ---------------------------------------------------------------------------
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// One review per customer per product; ratings on products are aggregated from APPROVED rows only.
+model Review {
+  id                 String       @id @default(uuid(7)) @db.Char(36)
+  productId          String       @db.Char(36)
+  userId             String       @db.Char(36)
+  rating             Int          @db.TinyInt
+  title              String       @db.VarChar(120)
+  body               String       @db.Text
+  status             ReviewStatus @default(PENDING)
+  /// True when the author had a paid order containing the product at submission time.
+  isVerifiedPurchase Boolean      @default(false)
+  moderationNote     String?      @db.VarChar(500)
+  moderatedById      String?      @db.Char(36)
+  moderatedAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moderatedBy User?   @relation("ReviewModerator", fields: [moderatedById], references: [id], onDelete: SetNull)
+
+  @@unique([productId, userId])
+  @@index([productId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@map("reviews")
+}
+
+model WishlistItem {
+  userId    String   @db.Char(36)
+  productId String   @db.Char(36)
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+  @@index([userId, createdAt])
+  @@map("wishlist_items")
 }
